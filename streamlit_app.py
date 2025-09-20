@@ -2,7 +2,10 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import re
+import re, random, os, warnings, shutil
+import matplotlib.pyplot as plt
+import seaborn as sns
+
 from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.preprocessing import LabelEncoder
@@ -10,7 +13,6 @@ from sklearn.metrics import classification_report, accuracy_score
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.utils.multiclass import unique_labels
 
 import tensorflow as tf
 from tensorflow.keras.preprocessing.text import Tokenizer
@@ -18,12 +20,16 @@ from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Embedding, Conv1D, GlobalMaxPooling1D, LSTM, Dense
 
+warnings.filterwarnings("ignore")
+st.set_option('deprecation.showPyplotGlobalUse', False)
+
 # ------------------------------------
 # Streamlit UI
 # ------------------------------------
-st.title("Requirement Classification App ")
+st.title("Requirement Classification App")
 
 uploaded_file = st.file_uploader("Upload your dataset (CSV/TSV)", type=["csv", "tsv"])
+results_df = None  # Initialize to avoid NameError
 
 if uploaded_file is not None:
     try:
@@ -48,10 +54,10 @@ if uploaded_file is not None:
         text = str(text)
         text = re.sub(r"[^a-zA-Z\s]", " ", text).lower()
         return " ".join([w for w in text.split() if w not in set(["the","and","is","of"])])
-
+    
     df["cleaned"] = df["RequirementText"].apply(clean_text)
 
-    # Encode labels
+    # Encode
     label_encoder = LabelEncoder()
     y = label_encoder.fit_transform(df["NFR"].astype(str))
     X = df["cleaned"].values
@@ -62,8 +68,7 @@ if uploaded_file is not None:
     run_button = st.button("Run Model")
 
     if run_button:
-        results = {}
-
+        preds = None
         if model_choice in ["Naive Bayes", "SVM", "Random Forest"]:
             tfidf = TfidfVectorizer(max_features=5000)
             X_train_tfidf = tfidf.fit_transform(X_train_text)
@@ -79,7 +84,7 @@ if uploaded_file is not None:
             model.fit(X_train_tfidf, y_train)
             preds = model.predict(X_test_tfidf)
 
-        elif model_choice == "CNN":
+        elif model_choice in ["CNN", "LSTM"]:
             tokenizer = Tokenizer(num_words=5000, oov_token="<OOV>")
             tokenizer.fit_on_texts(X_train_text)
             X_train_seq = tokenizer.texts_to_sequences(X_train_text)
@@ -87,75 +92,57 @@ if uploaded_file is not None:
             max_len = 50
             X_train_pad = pad_sequences(X_train_seq, maxlen=max_len, padding="post", truncating="post")
             X_test_pad = pad_sequences(X_test_seq, maxlen=max_len, padding="post", truncating="post")
-
             vocab_size = min(5000, len(tokenizer.word_index) + 1)
-            model = Sequential([
-                Embedding(vocab_size, 100, input_length=max_len),
-                Conv1D(128, 5, activation="relu"),
-                GlobalMaxPooling1D(),
-                Dense(64, activation="relu"),
-                Dense(len(label_encoder.classes_), activation="softmax")
-            ])
-            model.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
-            model.fit(X_train_pad, y_train, epochs=3, batch_size=32, validation_split=0.1, verbose=0)
-            preds = np.argmax(model.predict(X_test_pad), axis=1)
 
-        elif model_choice == "LSTM":
-            tokenizer = Tokenizer(num_words=5000, oov_token="<OOV>")
-            tokenizer.fit_on_texts(X_train_text)
-            X_train_seq = tokenizer.texts_to_sequences(X_train_text)
-            X_test_seq = tokenizer.texts_to_sequences(X_test_text)
-            max_len = 50
-            X_train_pad = pad_sequences(X_train_seq, maxlen=max_len, padding="post", truncating="post")
-            X_test_pad = pad_sequences(X_test_seq, maxlen=max_len, padding="post", truncating="post")
-
-            vocab_size = min(5000, len(tokenizer.word_index) + 1)
-            model = Sequential([
-                Embedding(vocab_size, 100, input_length=max_len),
-                LSTM(128, dropout=0.2),
-                Dense(64, activation="relu"),
-                Dense(len(label_encoder.classes_), activation="softmax")
-            ])
+            if model_choice == "CNN":
+                model = Sequential([
+                    Embedding(vocab_size, 100, input_length=max_len),
+                    Conv1D(128, 5, activation="relu"),
+                    GlobalMaxPooling1D(),
+                    Dense(64, activation="relu"),
+                    Dense(len(label_encoder.classes_), activation="softmax")
+                ])
+            else:  # LSTM
+                model = Sequential([
+                    Embedding(vocab_size, 100, input_length=max_len),
+                    LSTM(128, dropout=0.2),
+                    Dense(64, activation="relu"),
+                    Dense(len(label_encoder.classes_), activation="softmax")
+                ])
             model.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
             model.fit(X_train_pad, y_train, epochs=3, batch_size=32, validation_split=0.1, verbose=0)
             preds = np.argmax(model.predict(X_test_pad), axis=1)
 
         elif model_choice == "Zero-Shot BART":
-            @st.cache_resource
-            def load_zsl_model():
-                from transformers import pipeline
-                return pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
-
+            from transformers import pipeline  # lazy import
             with st.spinner("Loading Zero-Shot model..."):
-                zsl = load_zsl_model()
-
+                zsl = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
             preds = []
-            progress_bar = st.progress(0)
-            for i, text in enumerate(X_test_text):
+            for text in X_test_text:
                 res = zsl(text, list(label_encoder.classes_), multi_label=False)
                 preds.append(label_encoder.classes_.tolist().index(res["labels"][0]))
-                progress_bar.progress((i + 1) / len(X_test_text))
             preds = np.array(preds)
 
-        # Accuracy & Report
-        acc = accuracy_score(y_test, preds)
-        st.success(f"{model_choice} Accuracy: {acc:.2f}")
+        # Accuracy & Classification Report
+        if preds is not None:
+            try:
+                acc = accuracy_score(y_test, preds)
+                st.success(f"{model_choice} Accuracy: {acc:.2f}")
+                # Use labels to fix ValueError
+                st.text(classification_report(y_test, preds, labels=np.arange(len(label_encoder.classes_)), target_names=label_encoder.classes_))
+            except Exception as e:
+                st.error(f"Error in classification report: {e}")
 
-        # Fix for ValueError in classification_report
-        labels_in_test = unique_labels(y_test, preds)
-        st.text(classification_report(
-            y_test,
-            preds,
-            labels=labels_in_test,
-            target_names=label_encoder.inverse_transform(labels_in_test)
-        ))
-
-        # Save & Display Results
-        results_df = pd.DataFrame({
-            "RequirementText": X_test_text,
-            "Actual": label_encoder.inverse_transform(y_test),
-            "Predicted": label_encoder.inverse_transform(preds)
-        })
-        st.dataframe(results_df)  # show full results
-st.download_button("Download Results", results_df.to_csv(index=False), "results.csv", "text/csv")
-
+            # Save & Display Results
+            results_df = pd.DataFrame({
+                "RequirementText": X_test_text,
+                "Actual": label_encoder.inverse_transform(y_test),
+                "Predicted": label_encoder.inverse_transform(preds)
+            })
+            st.dataframe(results_df)  # show full results
+            st.download_button(
+                "Download Full Results",
+                results_df.to_csv(index=False),
+                "results.csv",
+                "text/csv"
+            )
