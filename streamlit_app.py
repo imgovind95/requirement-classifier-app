@@ -173,6 +173,146 @@
 #                 "text/csv"
 #             )
 # streamlit_app.py
+# import streamlit as st
+# import pandas as pd
+# import numpy as np
+# from sklearn.model_selection import train_test_split
+# from sklearn.preprocessing import LabelEncoder
+# from sklearn.naive_bayes import MultinomialNB
+# from sklearn.svm import SVC
+# from sklearn.ensemble import RandomForestClassifier
+# from sklearn.metrics import accuracy_score, classification_report
+# import tensorflow as tf
+# from tensorflow.keras.models import Sequential
+# from tensorflow.keras.layers import Dense, Embedding, LSTM, Conv1D, GlobalMaxPooling1D, Flatten
+# from tensorflow.keras.preprocessing.text import Tokenizer
+# from tensorflow.keras.preprocessing.sequence import pad_sequences
+# from transformers import pipeline
+
+# # ------------------ Streamlit UI ------------------
+# st.title("Requirement Classification App")
+# st.write("Upload your dataset (CSV/TSV)")
+
+# uploaded_file = st.file_uploader("Drag and drop file here", type=["csv","tsv"])
+# if uploaded_file:
+#     df = pd.read_csv(uploaded_file) if uploaded_file.name.endswith(".csv") else pd.read_csv(uploaded_file, sep="\t")
+#     st.write("Preview of Data:")
+#     st.dataframe(df.head())
+
+#     text_column = st.selectbox("Select text column", df.columns)
+#     label_column = st.selectbox("Select label column", df.columns)
+
+#     X = df[text_column].astype(str).values
+#     y = df[label_column].astype(str).values
+
+#     # Label encoding
+#     label_encoder = LabelEncoder()
+#     y_encoded = label_encoder.fit_transform(y)
+
+#     # Split data
+#     X_train, X_test, y_train, y_test = train_test_split(X, y_encoded, test_size=0.2, random_state=42)
+
+#     # ------------------ Load Transformers Models ------------------
+#     @st.cache_resource
+#     def load_transformers():
+#         bert_pipeline = pipeline("text-classification", model="bert-base-uncased")
+#         roberta_pipeline = pipeline("text-classification", model="roberta-base")
+#         bart_pipeline = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
+#         return bert_pipeline, roberta_pipeline, bart_pipeline
+
+#     bert_pipeline, roberta_pipeline, bart_pipeline = load_transformers()
+
+#     # ------------------ Model Selection ------------------
+#     model_choice = st.selectbox("Choose Model", [
+#         "NaiveBayes", "SVM", "RandomForest", "CNN", "LSTM", "BERT", "RoBERTa", "Zero-Shot BART"
+#     ])
+
+#     preds = []
+
+#     if st.button("Classify"):
+#         if model_choice in ["NaiveBayes", "SVM", "RandomForest"]:
+#             # Simple TF-IDF for sklearn models
+#             from sklearn.feature_extraction.text import TfidfVectorizer
+#             vectorizer = TfidfVectorizer(max_features=5000)
+#             X_train_vec = vectorizer.fit_transform(X_train)
+#             X_test_vec = vectorizer.transform(X_test)
+
+#             if model_choice == "NaiveBayes":
+#                 model = MultinomialNB()
+#             elif model_choice == "SVM":
+#                 model = SVC()
+#             else:
+#                 model = RandomForestClassifier()
+
+#             model.fit(X_train_vec, y_train)
+#             preds = model.predict(X_test_vec)
+
+#         elif model_choice in ["CNN", "LSTM"]:
+#             tokenizer = Tokenizer(num_words=5000)
+#             tokenizer.fit_on_texts(X_train)
+#             X_train_seq = pad_sequences(tokenizer.texts_to_sequences(X_train), maxlen=100)
+#             X_test_seq = pad_sequences(tokenizer.texts_to_sequences(X_test), maxlen=100)
+
+#             vocab_size = 5000
+#             if model_choice == "CNN":
+#                 model = Sequential([
+#                     Embedding(vocab_size, 128, input_length=100),
+#                     Conv1D(64, 5, activation='relu'),
+#                     GlobalMaxPooling1D(),
+#                     Dense(64, activation='relu'),
+#                     Dense(len(np.unique(y_train)), activation='softmax')
+#                 ])
+#             else:  # LSTM
+#                 model = Sequential([
+#                     Embedding(vocab_size, 128, input_length=100),
+#                     LSTM(64),
+#                     Dense(64, activation='relu'),
+#                     Dense(len(np.unique(y_train)), activation='softmax')
+#                 ])
+
+#             model.compile(loss='sparse_categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
+#             model.fit(X_train_seq, y_train, epochs=3, batch_size=32, verbose=0)
+#             preds = np.argmax(model.predict(X_test_seq), axis=1)
+
+#         elif model_choice in ["BERT", "RoBERTa"]:
+#             pipeline_model = bert_pipeline if model_choice == "BERT" else roberta_pipeline
+#             preds = []
+#             for text in X_test:
+#                 res = pipeline_model(text)[0]
+#                 # Find nearest label index
+#                 label = res['label'].replace("LABEL_", "")
+#                 if label.isdigit():
+#                     preds.append(int(label))
+#                 else:
+#                     # fallback: map string label to encoded
+#                     preds.append(label_encoder.transform([res['label']])[0])
+#             preds = np.array(preds)
+
+#         elif model_choice == "Zero-Shot BART":
+#             candidate_labels = label_encoder.classes_.tolist()
+#             preds = []
+#             for text in X_test:
+#                 res = bart_pipeline(text, candidate_labels)
+#                 label = res['labels'][0]
+#                 preds.append(label_encoder.transform([label])[0])
+#             preds = np.array(preds)
+
+#         # ------------------ Accuracy & Report ------------------
+#         acc = accuracy_score(y_test, preds)
+#         st.success(f"{model_choice} Accuracy: {acc:.2f}")
+
+#         try:
+#             st.text(classification_report(y_test, preds, target_names=label_encoder.classes_))
+#         except:
+#             st.warning("Classification report could not display (maybe mismatched labels)")
+
+#         # ------------------ Save & Display Results ------------------
+#         results_df = pd.DataFrame({
+#             "Text": X_test,
+#             "Predicted": label_encoder.inverse_transform(preds)
+#         })
+#         st.dataframe(results_df)
+#         st.download_button("Download Results CSV", results_df.to_csv(index=False), "results.csv")
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -184,132 +324,154 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, classification_report
 import tensorflow as tf
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense, Embedding, LSTM, Conv1D, GlobalMaxPooling1D, Flatten
+from tensorflow.keras.layers import Embedding, Conv1D, GlobalMaxPooling1D, LSTM, Dense
 from tensorflow.keras.preprocessing.text import Tokenizer
 from tensorflow.keras.preprocessing.sequence import pad_sequences
-from transformers import pipeline
 
-# ------------------ Streamlit UI ------------------
-st.title("Requirement Classification App")
-st.write("Upload your dataset (CSV/TSV)")
+# -------------------------------------------------------
+# Page Config
+# -------------------------------------------------------
+st.set_page_config(page_title="Requirement Classification App", layout="wide")
+st.title("📊 Requirement Classification App")
 
-uploaded_file = st.file_uploader("Drag and drop file here", type=["csv","tsv"])
+# -------------------------------------------------------
+# File Upload
+# -------------------------------------------------------
+uploaded_file = st.file_uploader("Upload your dataset (CSV/TSV)", type=["csv", "tsv"])
 if uploaded_file:
-    df = pd.read_csv(uploaded_file) if uploaded_file.name.endswith(".csv") else pd.read_csv(uploaded_file, sep="\t")
-    st.write("Preview of Data:")
+    sep = "," if uploaded_file.name.endswith(".csv") else "\t"
+    df = pd.read_csv(uploaded_file, sep=sep)
+    st.write("### Preview of Data:")
     st.dataframe(df.head())
 
-    text_column = st.selectbox("Select text column", df.columns)
-    label_column = st.selectbox("Select label column", df.columns)
+    if "text" not in df.columns or "label" not in df.columns:
+        st.error("Dataset must contain 'text' and 'label' columns.")
+    else:
+        X = df["text"].astype(str)
+        y = df["label"].astype(str)
 
-    X = df[text_column].astype(str).values
-    y = df[label_column].astype(str).values
+        # Label encode
+        label_encoder = LabelEncoder()
+        y_encoded = label_encoder.fit_transform(y)
 
-    # Label encoding
-    label_encoder = LabelEncoder()
-    y_encoded = label_encoder.fit_transform(y)
+        # Split data
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y_encoded, test_size=0.2, random_state=42
+        )
 
-    # Split data
-    X_train, X_test, y_train, y_test = train_test_split(X, y_encoded, test_size=0.2, random_state=42)
+        # -------------------------------------------------------
+        # Model Choice
+        # -------------------------------------------------------
+        model_choice = st.selectbox(
+            "Choose Model",
+            [
+                "Naive Bayes",
+                "SVM",
+                "Random Forest",
+                "CNN",
+                "LSTM",
+                "BERT",
+                "RoBERTa",
+                "Zero-Shot BART",
+            ],
+        )
 
-    # ------------------ Load Transformers Models ------------------
-    @st.cache_resource
-    def load_transformers():
-        bert_pipeline = pipeline("text-classification", model="bert-base-uncased")
-        roberta_pipeline = pipeline("text-classification", model="roberta-base")
-        bart_pipeline = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
-        return bert_pipeline, roberta_pipeline, bart_pipeline
+        results_df = None
 
-    bert_pipeline, roberta_pipeline, bart_pipeline = load_transformers()
+        # -------------------------------------------------------
+        # Traditional ML Models
+        # -------------------------------------------------------
+        if model_choice == "Naive Bayes":
+            model = MultinomialNB()
+            model.fit(X_train.str.len().values.reshape(-1, 1), y_train)
+            preds = model.predict(X_test.str.len().values.reshape(-1, 1))
 
-    # ------------------ Model Selection ------------------
-    model_choice = st.selectbox("Choose Model", [
-        "NaiveBayes", "SVM", "RandomForest", "CNN", "LSTM", "BERT", "RoBERTa", "Zero-Shot BART"
-    ])
+        elif model_choice == "SVM":
+            model = SVC()
+            model.fit(X_train.str.len().values.reshape(-1, 1), y_train)
+            preds = model.predict(X_test.str.len().values.reshape(-1, 1))
 
-    preds = []
+        elif model_choice == "Random Forest":
+            model = RandomForestClassifier()
+            model.fit(X_train.str.len().values.reshape(-1, 1), y_train)
+            preds = model.predict(X_test.str.len().values.reshape(-1, 1))
 
-    if st.button("Classify"):
-        if model_choice in ["NaiveBayes", "SVM", "RandomForest"]:
-            # Simple TF-IDF for sklearn models
-            from sklearn.feature_extraction.text import TfidfVectorizer
-            vectorizer = TfidfVectorizer(max_features=5000)
-            X_train_vec = vectorizer.fit_transform(X_train)
-            X_test_vec = vectorizer.transform(X_test)
-
-            if model_choice == "NaiveBayes":
-                model = MultinomialNB()
-            elif model_choice == "SVM":
-                model = SVC()
-            else:
-                model = RandomForestClassifier()
-
-            model.fit(X_train_vec, y_train)
-            preds = model.predict(X_test_vec)
-
+        # -------------------------------------------------------
+        # Deep Learning (CNN / LSTM)
+        # -------------------------------------------------------
         elif model_choice in ["CNN", "LSTM"]:
-            tokenizer = Tokenizer(num_words=5000)
+            max_words = 5000
+            max_len = 100
+            tokenizer = Tokenizer(num_words=max_words, oov_token="<OOV>")
             tokenizer.fit_on_texts(X_train)
-            X_train_seq = pad_sequences(tokenizer.texts_to_sequences(X_train), maxlen=100)
-            X_test_seq = pad_sequences(tokenizer.texts_to_sequences(X_test), maxlen=100)
 
-            vocab_size = 5000
+            X_train_seq = pad_sequences(tokenizer.texts_to_sequences(X_train), maxlen=max_len)
+            X_test_seq = pad_sequences(tokenizer.texts_to_sequences(X_test), maxlen=max_len)
+
+            model = Sequential()
+            model.add(Embedding(max_words, 128, input_length=max_len))
+
             if model_choice == "CNN":
-                model = Sequential([
-                    Embedding(vocab_size, 128, input_length=100),
-                    Conv1D(64, 5, activation='relu'),
-                    GlobalMaxPooling1D(),
-                    Dense(64, activation='relu'),
-                    Dense(len(np.unique(y_train)), activation='softmax')
-                ])
+                model.add(Conv1D(64, 5, activation="relu"))
+                model.add(GlobalMaxPooling1D())
             else:  # LSTM
-                model = Sequential([
-                    Embedding(vocab_size, 128, input_length=100),
-                    LSTM(64),
-                    Dense(64, activation='relu'),
-                    Dense(len(np.unique(y_train)), activation='softmax')
-                ])
+                model.add(LSTM(64))
 
-            model.compile(loss='sparse_categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
-            model.fit(X_train_seq, y_train, epochs=3, batch_size=32, verbose=0)
+            model.add(Dense(len(label_encoder.classes_), activation="softmax"))
+            model.compile(loss="sparse_categorical_crossentropy", optimizer="adam", metrics=["accuracy"])
+
+            model.fit(X_train_seq, y_train, epochs=2, batch_size=32, validation_split=0.1, verbose=0)
             preds = np.argmax(model.predict(X_test_seq), axis=1)
 
-        elif model_choice in ["BERT", "RoBERTa"]:
-            pipeline_model = bert_pipeline if model_choice == "BERT" else roberta_pipeline
-            preds = []
-            for text in X_test:
-                res = pipeline_model(text)[0]
-                # Find nearest label index
-                label = res['label'].replace("LABEL_", "")
-                if label.isdigit():
-                    preds.append(int(label))
-                else:
-                    # fallback: map string label to encoded
-                    preds.append(label_encoder.transform([res['label']])[0])
-            preds = np.array(preds)
+        # -------------------------------------------------------
+        # HuggingFace Models (Lazy Load)
+        # -------------------------------------------------------
+        else:
+            from transformers import pipeline
 
-        elif model_choice == "Zero-Shot BART":
-            candidate_labels = label_encoder.classes_.tolist()
-            preds = []
-            for text in X_test:
-                res = bart_pipeline(text, candidate_labels)
-                label = res['labels'][0]
-                preds.append(label_encoder.transform([label])[0])
-            preds = np.array(preds)
+            if model_choice == "BERT":
+                nlp = pipeline("text-classification", model="bert-base-uncased")
+                preds = [label_encoder.transform([nlp(t)[0]["label"]])[0] if nlp(t)[0]["label"] in label_encoder.classes_ else 0 for t in X_test]
 
-        # ------------------ Accuracy & Report ------------------
+            elif model_choice == "RoBERTa":
+                nlp = pipeline("text-classification", model="roberta-base")
+                preds = [label_encoder.transform([nlp(t)[0]["label"]])[0] if nlp(t)[0]["label"] in label_encoder.classes_ else 0 for t in X_test]
+
+            elif model_choice == "Zero-Shot BART":
+                nlp = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
+                preds = []
+                for t in X_test:
+                    result = nlp(t, candidate_labels=list(label_encoder.classes_))
+                    label = result["labels"][0]
+                    preds.append(label_encoder.transform([label])[0])
+
+        # -------------------------------------------------------
+        # Results
+        # -------------------------------------------------------
         acc = accuracy_score(y_test, preds)
         st.success(f"{model_choice} Accuracy: {acc:.2f}")
 
-        try:
-            st.text(classification_report(y_test, preds, target_names=label_encoder.classes_))
-        except:
-            st.warning("Classification report could not display (maybe mismatched labels)")
+        report = classification_report(
+            y_test,
+            preds,
+            labels=np.unique(y_test),
+            target_names=label_encoder.inverse_transform(np.unique(y_test)),
+        )
+        st.text(report)
 
-        # ------------------ Save & Display Results ------------------
         results_df = pd.DataFrame({
             "Text": X_test,
-            "Predicted": label_encoder.inverse_transform(preds)
+            "Actual": label_encoder.inverse_transform(y_test),
+            "Predicted": label_encoder.inverse_transform(preds),
         })
+
+        st.write("### Results Preview")
         st.dataframe(results_df)
-        st.download_button("Download Results CSV", results_df.to_csv(index=False), "results.csv")
+
+        # Full download
+        st.download_button(
+            "Download Results",
+            results_df.to_csv(index=False).encode("utf-8"),
+            "results.csv",
+            "text/csv",
+        )
