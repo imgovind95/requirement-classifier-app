@@ -2,7 +2,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import re, random, os, warnings, shutil
+import re, random, os, warnings
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -20,16 +20,17 @@ from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Embedding, Conv1D, GlobalMaxPooling1D, LSTM, Dense
 
-warnings.filterwarnings("ignore")
-st.set_option('deprecation.showPyplotGlobalUse', False)
+# Lazy import transformers pipeline to avoid ImportError
+def get_pipeline():
+    from transformers import pipeline
+    return pipeline
 
-# ------------------------------------
+# ----------------------------
 # Streamlit UI
-# ------------------------------------
+# ----------------------------
 st.title("Requirement Classification App")
 
 uploaded_file = st.file_uploader("Upload your dataset (CSV/TSV)", type=["csv", "tsv"])
-results_df = None  # Initialize to avoid NameError
 
 if uploaded_file is not None:
     try:
@@ -57,7 +58,7 @@ if uploaded_file is not None:
     
     df["cleaned"] = df["RequirementText"].apply(clean_text)
 
-    # Encode
+    # Encode labels
     label_encoder = LabelEncoder()
     y = label_encoder.fit_transform(df["NFR"].astype(str))
     X = df["cleaned"].values
@@ -69,6 +70,8 @@ if uploaded_file is not None:
 
     if run_button:
         preds = None
+
+        # Traditional ML models
         if model_choice in ["Naive Bayes", "SVM", "Random Forest"]:
             tfidf = TfidfVectorizer(max_features=5000)
             X_train_tfidf = tfidf.fit_transform(X_train_text)
@@ -84,7 +87,8 @@ if uploaded_file is not None:
             model.fit(X_train_tfidf, y_train)
             preds = model.predict(X_test_tfidf)
 
-        elif model_choice in ["CNN", "LSTM"]:
+        # CNN
+        elif model_choice == "CNN":
             tokenizer = Tokenizer(num_words=5000, oov_token="<OOV>")
             tokenizer.fit_on_texts(X_train_text)
             X_train_seq = tokenizer.texts_to_sequences(X_train_text)
@@ -92,54 +96,72 @@ if uploaded_file is not None:
             max_len = 50
             X_train_pad = pad_sequences(X_train_seq, maxlen=max_len, padding="post", truncating="post")
             X_test_pad = pad_sequences(X_test_seq, maxlen=max_len, padding="post", truncating="post")
-            vocab_size = min(5000, len(tokenizer.word_index) + 1)
 
-            if model_choice == "CNN":
-                model = Sequential([
-                    Embedding(vocab_size, 100, input_length=max_len),
-                    Conv1D(128, 5, activation="relu"),
-                    GlobalMaxPooling1D(),
-                    Dense(64, activation="relu"),
-                    Dense(len(label_encoder.classes_), activation="softmax")
-                ])
-            else:  # LSTM
-                model = Sequential([
-                    Embedding(vocab_size, 100, input_length=max_len),
-                    LSTM(128, dropout=0.2),
-                    Dense(64, activation="relu"),
-                    Dense(len(label_encoder.classes_), activation="softmax")
-                ])
+            vocab_size = min(5000, len(tokenizer.word_index) + 1)
+            model = Sequential([
+                Embedding(vocab_size, 100, input_length=max_len),
+                Conv1D(128, 5, activation="relu"),
+                GlobalMaxPooling1D(),
+                Dense(64, activation="relu"),
+                Dense(len(label_encoder.classes_), activation="softmax")
+            ])
             model.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
             model.fit(X_train_pad, y_train, epochs=3, batch_size=32, validation_split=0.1, verbose=0)
             preds = np.argmax(model.predict(X_test_pad), axis=1)
 
+        # LSTM
+        elif model_choice == "LSTM":
+            tokenizer = Tokenizer(num_words=5000, oov_token="<OOV>")
+            tokenizer.fit_on_texts(X_train_text)
+            X_train_seq = tokenizer.texts_to_sequences(X_train_text)
+            X_test_seq = tokenizer.texts_to_sequences(X_test_text)
+            max_len = 50
+            X_train_pad = pad_sequences(X_train_seq, maxlen=max_len, padding="post", truncating="post")
+            X_test_pad = pad_sequences(X_test_seq, maxlen=max_len, padding="post", truncating="post")
+
+            vocab_size = min(5000, len(tokenizer.word_index) + 1)
+            model = Sequential([
+                Embedding(vocab_size, 100, input_length=max_len),
+                LSTM(128, dropout=0.2),
+                Dense(64, activation="relu"),
+                Dense(len(label_encoder.classes_), activation="softmax")
+            ])
+            model.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
+            model.fit(X_train_pad, y_train, epochs=3, batch_size=32, validation_split=0.1, verbose=0)
+            preds = np.argmax(model.predict(X_test_pad), axis=1)
+
+        # Zero-Shot BART
         elif model_choice == "Zero-Shot BART":
-            from transformers import pipeline  # lazy import
-            with st.spinner("Loading Zero-Shot model..."):
-                zsl = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
-            preds = []
+            pipeline_fn = get_pipeline()
+            zsl = pipeline_fn("zero-shot-classification", model="facebook/bart-large-mnli")
+            preds_list = []
             for text in X_test_text:
                 res = zsl(text, list(label_encoder.classes_), multi_label=False)
-                preds.append(label_encoder.classes_.tolist().index(res["labels"][0]))
-            preds = np.array(preds)
+                preds_list.append(label_encoder.classes_.tolist().index(res["labels"][0]))
+            preds = np.array(preds_list)
 
-        # Accuracy & Classification Report
+        # If predictions exist, show accuracy and results
         if preds is not None:
-            try:
-                acc = accuracy_score(y_test, preds)
-                st.success(f"{model_choice} Accuracy: {acc:.2f}")
-                # Use labels to fix ValueError
-                st.text(classification_report(y_test, preds, labels=np.arange(len(label_encoder.classes_)), target_names=label_encoder.classes_))
-            except Exception as e:
-                st.error(f"Error in classification report: {e}")
+            acc = accuracy_score(y_test, preds)
+            st.success(f"{model_choice} Accuracy: {acc:.2f}")
 
-            # Save & Display Results
+            st.text(classification_report(
+                y_test,
+                preds,
+                labels=np.arange(len(label_encoder.classes_)),
+                target_names=label_encoder.classes_
+            ))
+
+            # Full results dataframe
             results_df = pd.DataFrame({
                 "RequirementText": X_test_text,
                 "Actual": label_encoder.inverse_transform(y_test),
                 "Predicted": label_encoder.inverse_transform(preds)
             })
+
             st.dataframe(results_df)  # show full results
+
+            # Download button for full results
             st.download_button(
                 "Download Full Results",
                 results_df.to_csv(index=False),
