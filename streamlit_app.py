@@ -1051,6 +1051,146 @@
 #     else:
 #         st.error("Prediction length does not match test data length.")
 
+# import streamlit as st
+# import pandas as pd
+# import numpy as np
+# from sklearn.model_selection import train_test_split
+# from sklearn.preprocessing import LabelEncoder
+# from sklearn.feature_extraction.text import TfidfVectorizer
+# from sklearn.naive_bayes import MultinomialNB
+# from sklearn.svm import SVC
+# from sklearn.ensemble import RandomForestClassifier
+# from sklearn.metrics import accuracy_score, classification_report
+# from tensorflow.keras.models import Sequential
+# from tensorflow.keras.layers import Dense, Embedding, GlobalMaxPooling1D, Conv1D, LSTM
+# from tensorflow.keras.preprocessing.text import Tokenizer
+# from tensorflow.keras.preprocessing.sequence import pad_sequences
+# import torch
+# from transformers import AutoTokenizer, AutoModelForSequenceClassification, pipeline
+
+# st.title("Requirement Classification App")
+
+# uploaded_file = st.file_uploader("Upload your dataset (CSV/TSV)", type=["csv", "tsv"])
+
+# if uploaded_file is not None:
+#     # Load dataset
+#     try:
+#         if uploaded_file.name.endswith(".csv"):
+#             df = pd.read_csv(uploaded_file)
+#         else:
+#             df = pd.read_csv(uploaded_file, sep="\t")
+#         st.success("Dataset loaded successfully!")
+#     except Exception as e:
+#         st.error(f"Error loading file: {e}")
+#         st.stop()
+
+#     st.dataframe(df.head())
+
+#     # Select text and label columns
+#     text_col = st.selectbox("Select text column", df.columns)
+#     label_col = st.selectbox("Select label column", df.columns)
+
+#     X = df[text_col].astype(str)
+#     y = df[label_col]
+
+#     # Encode labels
+#     label_encoder = LabelEncoder()
+#     y_encoded = label_encoder.fit_transform(y)
+
+#     # ✅ Stratify removed to fix ValueError
+#     X_train, X_test, y_train, y_test = train_test_split(
+#         X, y_encoded, test_size=0.2, random_state=42
+#     )
+
+#     model_choice = st.selectbox(
+#         "Choose Model",
+#         ["NaiveBayes", "SVM", "RandomForest", "CNN", "LSTM", "BERT", "RoBERTa"]
+#     )
+
+#     results_df = pd.DataFrame()
+#     preds = []
+
+#     if model_choice in ["NaiveBayes", "SVM", "RandomForest"]:
+#         vectorizer = TfidfVectorizer(max_features=5000)
+#         X_train_tfidf = vectorizer.fit_transform(X_train)
+#         X_test_tfidf = vectorizer.transform(X_test)
+
+#         if model_choice == "NaiveBayes":
+#             clf = MultinomialNB()
+#         elif model_choice == "SVM":
+#             clf = SVC()
+#         else:
+#             clf = RandomForestClassifier()
+
+#         clf.fit(X_train_tfidf, y_train)
+#         preds = clf.predict(X_test_tfidf)
+
+#     elif model_choice in ["CNN", "LSTM"]:
+#         tokenizer = Tokenizer(num_words=5000)
+#         tokenizer.fit_on_texts(X_train)
+#         X_train_seq = pad_sequences(tokenizer.texts_to_sequences(X_train), maxlen=100)
+#         X_test_seq = pad_sequences(tokenizer.texts_to_sequences(X_test), maxlen=100)
+
+#         vocab_size = 5000
+#         embedding_dim = 50
+
+#         model = Sequential()
+#         model.add(Embedding(vocab_size, embedding_dim, input_length=100))
+#         if model_choice == "CNN":
+#             model.add(Conv1D(128, 5, activation="relu"))
+#             model.add(GlobalMaxPooling1D())
+#         else:
+#             model.add(LSTM(128))
+#         model.add(Dense(len(label_encoder.classes_), activation="softmax"))
+#         model.compile(loss="sparse_categorical_crossentropy", optimizer="adam", metrics=["accuracy"])
+#         model.fit(X_train_seq, y_train, epochs=3, batch_size=32, verbose=0)
+#         preds_probs = model.predict(X_test_seq)
+#         preds = np.argmax(preds_probs, axis=1)
+
+#     elif model_choice in ["BERT", "RoBERTa"]:
+#         if model_choice == "BERT":
+#             model_name = "bert-base-uncased"
+#         else:
+#             model_name = "roberta-base"
+
+#         bert_tokenizer = AutoTokenizer.from_pretrained(model_name)
+#         bert_model = AutoModelForSequenceClassification.from_pretrained(
+#             model_name, num_labels=len(label_encoder.classes_)
+#         )
+#         classifier = pipeline("text-classification", model=bert_model, tokenizer=bert_tokenizer)
+
+#         preds = []
+#         for text in X_test:
+#             pred = classifier(text, truncation=True)
+#             label = pred[0]["label"]
+#             if label.startswith("LABEL_"):
+#                 idx = int(label.split("_")[1])
+#                 preds.append(idx)
+#             else:
+#                 preds.append(0)
+
+#     # Show accuracy & classification report safely
+#     if len(preds) == len(y_test):
+#         acc = accuracy_score(y_test, preds)
+#         st.success(f"{model_choice} Accuracy: {acc:.2f}")
+
+#         st.text(classification_report(
+#             y_test,
+#             preds,
+#             target_names=label_encoder.classes_
+#         ))
+
+#         results_df = pd.DataFrame({
+#             "Text": X_test,
+#             "Actual": label_encoder.inverse_transform(y_test),
+#             "Predicted": label_encoder.inverse_transform(preds)
+#         })
+
+#         st.dataframe(results_df)
+#         st.download_button("Download Results", results_df.to_csv(index=False), "results.csv")
+#     else:
+#         st.error("Prediction length does not match test data length.")
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -1065,7 +1205,7 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Embedding, GlobalMaxPooling1D, Conv1D, LSTM
 from tensorflow.keras.preprocessing.text import Tokenizer
 from tensorflow.keras.preprocessing.sequence import pad_sequences
-import torch
+from sklearn.utils.multiclass import unique_labels
 from transformers import AutoTokenizer, AutoModelForSequenceClassification, pipeline
 
 st.title("Requirement Classification App")
@@ -1073,7 +1213,6 @@ st.title("Requirement Classification App")
 uploaded_file = st.file_uploader("Upload your dataset (CSV/TSV)", type=["csv", "tsv"])
 
 if uploaded_file is not None:
-    # Load dataset
     try:
         if uploaded_file.name.endswith(".csv"):
             df = pd.read_csv(uploaded_file)
@@ -1086,18 +1225,22 @@ if uploaded_file is not None:
 
     st.dataframe(df.head())
 
-    # Select text and label columns
-    text_col = st.selectbox("Select text column", df.columns)
-    label_col = st.selectbox("Select label column", df.columns)
+    # text_col = st.selectbox("Select text column", df.columns)
+    # label_col = st.selectbox("Select label column", df.columns)
 
     X = df[text_col].astype(str)
     y = df[label_col]
 
-    # Encode labels
+    # Drop classes with only 1 sample to avoid train_test_split error
+    class_counts = y.value_counts()
+    valid_classes = class_counts[class_counts > 1].index
+    mask = y.isin(valid_classes)
+    X = X[mask]
+    y = y[mask]
+
     label_encoder = LabelEncoder()
     y_encoded = label_encoder.fit_transform(y)
 
-    # ✅ Stratify removed to fix ValueError
     X_train, X_test, y_train, y_test = train_test_split(
         X, y_encoded, test_size=0.2, random_state=42
     )
@@ -1106,10 +1249,10 @@ if uploaded_file is not None:
         "Choose Model",
         ["NaiveBayes", "SVM", "RandomForest", "CNN", "LSTM", "BERT", "RoBERTa"]
     )
+if run_button:
+        preds = None
 
-    results_df = pd.DataFrame()
-    preds = []
-
+    # Classic ML models
     if model_choice in ["NaiveBayes", "SVM", "RandomForest"]:
         vectorizer = TfidfVectorizer(max_features=5000)
         X_train_tfidf = vectorizer.fit_transform(X_train)
@@ -1125,17 +1268,15 @@ if uploaded_file is not None:
         clf.fit(X_train_tfidf, y_train)
         preds = clf.predict(X_test_tfidf)
 
+    # Deep Learning
     elif model_choice in ["CNN", "LSTM"]:
         tokenizer = Tokenizer(num_words=5000)
         tokenizer.fit_on_texts(X_train)
         X_train_seq = pad_sequences(tokenizer.texts_to_sequences(X_train), maxlen=100)
         X_test_seq = pad_sequences(tokenizer.texts_to_sequences(X_test), maxlen=100)
 
-        vocab_size = 5000
-        embedding_dim = 50
-
         model = Sequential()
-        model.add(Embedding(vocab_size, embedding_dim, input_length=100))
+        model.add(Embedding(5000, 50, input_length=100))
         if model_choice == "CNN":
             model.add(Conv1D(128, 5, activation="relu"))
             model.add(GlobalMaxPooling1D())
@@ -1147,6 +1288,7 @@ if uploaded_file is not None:
         preds_probs = model.predict(X_test_seq)
         preds = np.argmax(preds_probs, axis=1)
 
+    # Transformers
     elif model_choice in ["BERT", "RoBERTa"]:
         if model_choice == "BERT":
             model_name = "bert-base-uncased"
@@ -1169,16 +1311,16 @@ if uploaded_file is not None:
             else:
                 preds.append(0)
 
-    # Show accuracy & classification report safely
+    # Safe evaluation
     if len(preds) == len(y_test):
         acc = accuracy_score(y_test, preds)
         st.success(f"{model_choice} Accuracy: {acc:.2f}")
 
-        st.text(classification_report(
-            y_test,
-            preds,
-            target_names=label_encoder.classes_
-        ))
+        # Only consider labels actually present in test
+        labels_used = unique_labels(y_test, preds)
+        target_names = [label_encoder.classes_[i] for i in labels_used]
+
+        st.text(classification_report(y_test, preds, labels=labels_used, target_names=target_names))
 
         results_df = pd.DataFrame({
             "Text": X_test,
@@ -1190,4 +1332,3 @@ if uploaded_file is not None:
         st.download_button("Download Results", results_df.to_csv(index=False), "results.csv")
     else:
         st.error("Prediction length does not match test data length.")
-
