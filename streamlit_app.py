@@ -130,19 +130,19 @@ if uploaded_file is not None:
             model.fit(X_train_pad, y_train, epochs=3, batch_size=32, validation_split=0.1, verbose=0)
             preds = np.argmax(model.predict(X_test_pad), axis=1)
 
-        # Zero-Shot BART
-        elif model_choice == "Zero-Shot BART":
-    try:
-        from transformers import pipeline
-        zsl = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
-        preds_list = []
-        for text in X_test_text:
-            res = zsl(text, list(label_encoder.classes_), multi_label=False)
-            preds_list.append(label_encoder.classes_.tolist().index(res["labels"][0]))
-        preds = np.array(preds_list)
-    except Exception as e:
-        st.error("Zero-Shot BART failed. Make sure transformers & torch are installed.")
-        st.stop()
+    #     # Zero-Shot BART
+    #     elif model_choice == "Zero-Shot BART":
+    # try:
+    #     from transformers import pipeline
+    #     zsl = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
+    #     preds_list = []
+    #     for text in X_test_text:
+    #         res = zsl(text, list(label_encoder.classes_), multi_label=False)
+    #         preds_list.append(label_encoder.classes_.tolist().index(res["labels"][0]))
+    #     preds = np.array(preds_list)
+    # except Exception as e:
+    #     st.error("Zero-Shot BART failed. Make sure transformers & torch are installed.")
+    #     st.stop()
 
         # If predictions exist, show accuracy and results
         if preds is not None:
