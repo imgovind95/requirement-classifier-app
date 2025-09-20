@@ -123,12 +123,32 @@ if uploaded_file is not None:
             model.fit(X_train_pad, y_train, epochs=3, batch_size=32, validation_split=0.1, verbose=0)
             preds = np.argmax(model.predict(X_test_pad), axis=1)
 
+        # elif model_choice == "Zero-Shot BART":
+        #     zsl = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
+        #     preds = []
+        #     for text in X_test_text:
+        #         res = zsl(text, list(label_encoder.classes_), multi_label=False)
+        #         preds.append(label_encoder.classes_.tolist().index(res["labels"][0]))
+        #     preds = np.array(preds)
         elif model_choice == "Zero-Shot BART":
-            zsl = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
+            # Cache the model loading function
+            @st.cache_resource
+            def load_zsl_model():
+                # Move the import inside the function for lazy loading
+                from transformers import pipeline
+                return pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
+
+            with st.spinner("Loading Zero-Shot model... (this may take a moment on first run)"):
+                zsl = load_zsl_model()
+
             preds = []
-            for text in X_test_text:
+            # Use st.progress to show classification progress
+            progress_bar = st.progress(0)
+            for i, text in enumerate(X_test_text):
                 res = zsl(text, list(label_encoder.classes_), multi_label=False)
                 preds.append(label_encoder.classes_.tolist().index(res["labels"][0]))
+                progress_bar.progress((i + 1) / len(X_test_text))
+            
             preds = np.array(preds)
 
         acc = accuracy_score(y_test, preds)
