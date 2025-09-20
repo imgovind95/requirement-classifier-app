@@ -2,7 +2,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import re, os
+import re
 from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.preprocessing import LabelEncoder
@@ -10,6 +10,7 @@ from sklearn.metrics import classification_report, accuracy_score
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.utils.multiclass import unique_labels
 
 import tensorflow as tf
 from tensorflow.keras.preprocessing.text import Tokenizer
@@ -120,7 +121,6 @@ if uploaded_file is not None:
             preds = np.argmax(model.predict(X_test_pad), axis=1)
 
         elif model_choice == "Zero-Shot BART":
-            # Lazy import and cache for Streamlit
             @st.cache_resource
             def load_zsl_model():
                 from transformers import pipeline
@@ -140,7 +140,15 @@ if uploaded_file is not None:
         # Accuracy & Report
         acc = accuracy_score(y_test, preds)
         st.success(f"{model_choice} Accuracy: {acc:.2f}")
-        st.text(classification_report(y_test, preds, target_names=label_encoder.classes_))
+
+        # Fix for ValueError in classification_report
+        labels_in_test = unique_labels(y_test, preds)
+        st.text(classification_report(
+            y_test,
+            preds,
+            labels=labels_in_test,
+            target_names=label_encoder.inverse_transform(labels_in_test)
+        ))
 
         # Save & Display Results
         results_df = pd.DataFrame({
@@ -148,5 +156,6 @@ if uploaded_file is not None:
             "Actual": label_encoder.inverse_transform(y_test),
             "Predicted": label_encoder.inverse_transform(preds)
         })
-        st.dataframe(results_df.head())
-        st.download_button("Download Results", results_df.to_csv(index=False), "results.csv", "text/csv")
+        st.dataframe(results_df)  # show full results
+st.download_button("Download Results", results_df.to_csv(index=False), "results.csv", "text/csv")
+
