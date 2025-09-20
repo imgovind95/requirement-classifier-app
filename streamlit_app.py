@@ -2,10 +2,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import re, random, os, warnings, shutil
-import matplotlib.pyplot as plt
-import seaborn as sns
-
+import re, os
 from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.preprocessing import LabelEncoder
@@ -19,8 +16,6 @@ from tensorflow.keras.preprocessing.text import Tokenizer
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Embedding, Conv1D, GlobalMaxPooling1D, LSTM, Dense
-
-from transformers import pipeline
 
 # ------------------------------------
 # Streamlit UI
@@ -52,10 +47,10 @@ if uploaded_file is not None:
         text = str(text)
         text = re.sub(r"[^a-zA-Z\s]", " ", text).lower()
         return " ".join([w for w in text.split() if w not in set(["the","and","is","of"])])
-    
+
     df["cleaned"] = df["RequirementText"].apply(clean_text)
 
-    # Encode
+    # Encode labels
     label_encoder = LabelEncoder()
     y = label_encoder.fit_transform(df["NFR"].astype(str))
     X = df["cleaned"].values
@@ -67,6 +62,7 @@ if uploaded_file is not None:
 
     if run_button:
         results = {}
+
         if model_choice in ["Naive Bayes", "SVM", "Random Forest"]:
             tfidf = TfidfVectorizer(max_features=5000)
             X_train_tfidf = tfidf.fit_transform(X_train_text)
@@ -124,38 +120,29 @@ if uploaded_file is not None:
             preds = np.argmax(model.predict(X_test_pad), axis=1)
 
         elif model_choice == "Zero-Shot BART":
-            zsl = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
+            # Lazy import and cache for Streamlit
+            @st.cache_resource
+            def load_zsl_model():
+                from transformers import pipeline
+                return pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
+
+            with st.spinner("Loading Zero-Shot model..."):
+                zsl = load_zsl_model()
+
             preds = []
-            for text in X_test_text:
+            progress_bar = st.progress(0)
+            for i, text in enumerate(X_test_text):
                 res = zsl(text, list(label_encoder.classes_), multi_label=False)
                 preds.append(label_encoder.classes_.tolist().index(res["labels"][0]))
+                progress_bar.progress((i + 1) / len(X_test_text))
             preds = np.array(preds)
-        # elif model_choice == "Zero-Shot BART":
-        #     # Cache the model loading function
-        #     @st.cache_resource
-        #     def load_zsl_model():
-        #         # Move the import inside the function for lazy loading
-        #         from transformers import pipeline
-        #         return pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
 
-        #     with st.spinner("Loading Zero-Shot model... (this may take a moment on first run)"):
-        #         zsl = load_zsl_model()
-
-        #     preds = []
-        #     # Use st.progress to show classification progress
-        #     progress_bar = st.progress(0)
-        #     for i, text in enumerate(X_test_text):
-        #         res = zsl(text, list(label_encoder.classes_), multi_label=False)
-        #         preds.append(label_encoder.classes_.tolist().index(res["labels"][0]))
-        #         progress_bar.progress((i + 1) / len(X_test_text))
-            
-        #     preds = np.array(preds)
-
+        # Accuracy & Report
         acc = accuracy_score(y_test, preds)
-        st.success(f" {model_choice} Accuracy: {acc:.2f}")
+        st.success(f"{model_choice} Accuracy: {acc:.2f}")
         st.text(classification_report(y_test, preds, target_names=label_encoder.classes_))
 
-        # Save results
+        # Save & Display Results
         results_df = pd.DataFrame({
             "RequirementText": X_test_text,
             "Actual": label_encoder.inverse_transform(y_test),
