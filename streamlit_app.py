@@ -366,7 +366,6 @@ Separate columns using a comma. Each row must be on a new line. Output only CSV 
             raw_text = response.text.strip().replace('`', '')
             
             lines = raw_text.split("\n")
-            # Filter for lines that look like CSV and have exactly 2 comma-separated values
             csv_lines = [line for line in lines if len(line.split(",")) == 2]
             csv_text = "\n".join(csv_lines)
 
@@ -417,12 +416,12 @@ if st.session_state.df is not None:
         st.error("Could not find any labels to train on.")
         st.stop()
 
-    # Model Selection with new models
+    # --- ⭐️ CORRECTED MODEL SELECTION ⭐️ ---
     model_choice = st.selectbox(
         "Choose Model",
         [
             "Naive Bayes", "SVM", "Random Forest", "CNN", "LSTM",
-            "Zero-Shot (BART-Large)", "Zero-Shot (RoBERTa-Large)"
+            "Zero-Shot (BART-Large)", "Zero-Shot (DeBERTa-small)"
         ]
     )
     run_button = st.button("Run Model and Classify Full Dataset")
@@ -432,7 +431,6 @@ if st.session_state.df is not None:
             full_preds = None
 
             if model_choice in ["Naive Bayes", "SVM", "Random Forest", "CNN", "LSTM"]:
-                # Split data for training these models
                 X_train_text, _, y_train, _ = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
             
             if model_choice in ["Naive Bayes", "SVM", "Random Forest"]:
@@ -466,14 +464,14 @@ if st.session_state.df is not None:
                 X_full_pad = pad_sequences(tokenizer.texts_to_sequences(X), maxlen=max_len, padding="post")
                 full_preds = np.argmax(model.predict(X_full_pad), axis=1)
 
-            # --- NEW BLOCK FOR ZERO-SHOT MODELS ---
-            elif model_choice in ["Zero-Shot (BART-Large)", "Zero-Shot (RoBERTa-Large)"]:
+            elif model_choice in ["Zero-Shot (BART-Large)", "Zero-Shot (DeBERTa-small)"]:
                 st.info("Zero-Shot models classify based on label meanings, no training is needed. This might take a while...")
                 
                 candidate_labels = label_encoder.classes_.tolist()
+                # --- ⭐️ CORRECTED MODEL MAP ⭐️ ---
                 model_map = {
                     "Zero-Shot (BART-Large)": "facebook/bart-large-mnli",
-                    "Zero-Shot (RoBERTa-Large)": "joeddav/xlm-roberta-large-xnli"
+                    "Zero-Shot (DeBERTa-small)": "Narsil/deberta-v3-small-mnli"
                 }
                 zsl_pipeline = load_zsl_pipeline(model_map[model_choice])
 
@@ -486,7 +484,6 @@ if st.session_state.df is not None:
                 
                 label_to_int = {label: i for i, label in enumerate(label_encoder.classes_)}
                 full_preds = np.array([label_to_int[pred] for pred in temp_preds])
-            # --- END OF NEW BLOCK ---
 
             if full_preds is not None:
                 st.header("Full Dataset Classification Results")
