@@ -173,7 +173,7 @@ if st.session_state.df is not None:
     # --- ⭐ ERROR DETECTIVE IS ADDED HERE ---
     if run_button:
         try:
-            st.write("Debug: 'Run Model' button clicked. Starting process...")
+            st.write("'Run Model' button clicked. Starting process...")
             preds = None
             full_preds = None 
 
