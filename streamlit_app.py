@@ -24,8 +24,8 @@ import google.generativeai as genai
 from io import StringIO
 
 # ✅ CHANGE 2: Fix API key here (user ko key dalne ki need nahi)
-GEMINI_API_KEY = "YOUR_API_KEY_HERE"   # <- yahan apna Gemini API key paste karo
-genai.configure(api_key=GEMINI_API_KEY)
+GEMINI_API_KEY = "AIzaSyByKSIsncltKAAhIg1NH7pPSCfGRqctxWc"   # <- yahan apna Gemini API key paste karo
+genai.configure(api_key=AIzaSyByKSIsncltKAAhIg1NH7pPSCfGRqctxWc)
 
 # ----------------------------
 # Streamlit UI
