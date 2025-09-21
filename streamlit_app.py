@@ -199,7 +199,7 @@ from tensorflow.keras.layers import Embedding, Conv1D, GlobalMaxPooling1D, LSTM,
 # ----------------------------
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 
-st.title("Requirement Classification App with Gemini Dataset Builder")
+st.title("Requirement Classification App Dataset Builder")
 
 # ----------------------------
 # Helpers
@@ -232,7 +232,7 @@ if "df" not in st.session_state:
 # Step 0: Local file upload
 # ----------------------------
 uploaded_file = st.file_uploader(
-    "Upload your dataset (CSV/TSV) or leave empty to generate via Gemini API:",
+    "Upload your dataset (CSV/TSV) or leave empty to generate :",
     type=["csv", "tsv"]
 )
 
@@ -254,13 +254,18 @@ if uploaded_file is not None:
 # Step 1: Gemini dataset generation
 # ----------------------------
 if st.session_state.df is None:
+    num_rows = st.number_input(
+        "How many requirements to generate?", min_value=1, value=20, step=1
+    )
+
     prompt = st.text_area(
         "Write your prompt for dataset (CSV format):",
-        "Generate 20 software requirements in CSV format with EXACTLY 2 columns: RequirementText and NFR. "
+        f"Generate {num_rows} software requirements in CSV format with EXACTLY 2 columns: RequirementText and NFR. "
         "Each row must have exactly 2 fields. Do not use commas or quotes inside the RequirementText or NFR fields. "
         "Separate columns using a comma. Each row must be on a new line. Output only CSV content, no extra explanation or text."
     )
-    gen_button = st.button("Generate Dataset via Gemini API")
+
+    gen_button = st.button("Generate Dataset")
 
     if gen_button and prompt:
         try:
@@ -268,12 +273,14 @@ if st.session_state.df is None:
             response = model.generate_content(prompt)
             raw_text = response.text
 
-            try:
-                df = pd.read_csv(StringIO(raw_text))
-            except pd.errors.ParserError:
-                df = pd.read_csv(StringIO(raw_text), sep="\t")
+            # Ensure only lines with exactly 2 fields are used
+            lines = raw_text.strip().split("\n")
+            csv_lines = [line for line in lines if len(line.split(",")) == 2]
+            csv_text = "\n".join(csv_lines)
 
+            df = pd.read_csv(StringIO(csv_text), names=["RequirementText", "NFR"])
             df = fix_columns(df)
+
             if "RequirementText" not in df.columns or "NFR" not in df.columns:
                 st.error("Dataset missing 'RequirementText' or 'NFR'. Please refine your prompt.")
             else:
@@ -387,6 +394,7 @@ if st.session_state.df is not None:
                 "results.csv",
                 "text/csv"
             )
+
 
 
 
