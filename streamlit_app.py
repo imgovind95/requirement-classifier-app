@@ -724,6 +724,110 @@ Separate columns using a comma. Each row must be on a new line. Output only CSV 
 # ----------------------------
 # Step 2: Train Models
 # ----------------------------
+# if st.session_state.df is not None:
+#     st.header("Train a Model")
+#     df = st.session_state.df
+#     label_encoder = LabelEncoder()
+#     y = label_encoder.fit_transform(df["NFR"].astype(str))
+#     X = df["cleaned"].values
+
+#     X_train_text, X_test_text, y_train, y_test = train_test_split(
+#         X, y, test_size=0.2, random_state=42
+#     )
+
+#     model_choice = st.selectbox("Choose Model", ["Naive Bayes", "SVM", "Random Forest", "CNN", "LSTM"])
+#     run_button = st.button("Run Model")
+
+#     if run_button:
+#         preds = None
+
+#         if model_choice in ["Naive Bayes", "SVM", "Random Forest"]:
+#             tfidf = TfidfVectorizer(max_features=5000)
+#             X_train_tfidf = tfidf.fit_transform(X_train_text)
+#             X_test_tfidf = tfidf.transform(X_test_text)
+
+#             if model_choice == "Naive Bayes":
+#                 model = MultinomialNB()
+#             elif model_choice == "SVM":
+#                 model = SVC(kernel="linear", random_state=42)
+#             else:
+#                 model = RandomForestClassifier(n_estimators=100, random_state=42)
+
+#             model.fit(X_train_tfidf, y_train)
+#             preds = model.predict(X_test_tfidf)
+
+#         elif model_choice == "CNN":
+#             tokenizer = Tokenizer(num_words=5000, oov_token="<OOV>")
+#             tokenizer.fit_on_texts(X_train_text)
+#             X_train_seq = tokenizer.texts_to_sequences(X_train_text)
+#             X_test_seq = tokenizer.texts_to_sequences(X_test_text)
+
+#             max_len = 50
+#             X_train_pad = pad_sequences(X_train_seq, maxlen=max_len, padding="post", truncating="post")
+#             X_test_pad = pad_sequences(X_test_seq, maxlen=max_len, padding="post", truncating="post")
+
+#             vocab_size = min(5000, len(tokenizer.word_index) + 1)
+#             model = Sequential([
+#                 Embedding(vocab_size, 100, input_length=max_len),
+#                 Conv1D(128, 5, activation="relu"),
+#                 GlobalMaxPooling1D(),
+#                 Dense(64, activation="relu"),
+#                 Dense(len(label_encoder.classes_), activation="softmax")
+#             ])
+#             model.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
+#             model.fit(X_train_pad, y_train, epochs=3, batch_size=32, validation_split=0.1, verbose=0)
+#             preds = np.argmax(model.predict(X_test_pad), axis=1)
+
+#         elif model_choice == "LSTM":
+#             tokenizer = Tokenizer(num_words=5000, oov_token="<OOV>")
+#             tokenizer.fit_on_texts(X_train_text)
+#             X_train_seq = tokenizer.texts_to_sequences(X_train_text)
+#             X_test_seq = tokenizer.texts_to_sequences(X_test_text)
+
+#             max_len = 50
+#             X_train_pad = pad_sequences(X_train_seq, maxlen=max_len, padding="post", truncating="post")
+#             X_test_pad = pad_sequences(X_test_seq, maxlen=max_len, padding="post", truncating="post")
+
+#             vocab_size = min(5000, len(tokenizer.word_index) + 1)
+#             model = Sequential([
+#                 Embedding(vocab_size, 100, input_length=max_len),
+#                 LSTM(128, dropout=0.2),
+#                 Dense(64, activation="relu"),
+#                 Dense(len(label_encoder.classes_), activation="softmax")
+#             ])
+#             model.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
+#             model.fit(X_train_pad, y_train, epochs=3, batch_size=32, validation_split=0.1, verbose=0)
+#             preds = np.argmax(model.predict(X_test_pad), axis=1)
+
+#         if preds is not None:
+#             acc = accuracy_score(y_test, preds)
+#             st.success(f"{model_choice} Accuracy: {acc:.2f}")
+
+#             st.text(classification_report(
+#                 y_test,
+#                 preds,
+#                 labels=np.arange(len(label_encoder.classes_)),
+#                 target_names=label_encoder.classes_
+#             ))
+
+#             results_df = pd.DataFrame({
+#                 "RequirementText": X_test_text,
+#                 "Actual": label_encoder.inverse_transform(y_test),
+#                 "Predicted": label_encoder.inverse_transform(preds)
+#             })
+
+#             st.dataframe(results_df)
+
+#             st.download_button(
+#                 "Download Full Results",
+#                 results_df.to_csv(index=False),
+#                 "results.csv",
+#                 "text/csv"
+#             )
+
+# ----------------------------
+# Step 2: Train Models
+# ----------------------------
 if st.session_state.df is not None:
     st.header("Train a Model")
     df = st.session_state.df
@@ -740,7 +844,9 @@ if st.session_state.df is not None:
 
     if run_button:
         preds = None
+        full_preds = None # Variable to store full dataset predictions
 
+        # --- Training the chosen model ---
         if model_choice in ["Naive Bayes", "SVM", "Random Forest"]:
             tfidf = TfidfVectorizer(max_features=5000)
             X_train_tfidf = tfidf.fit_transform(X_train_text)
@@ -754,77 +860,67 @@ if st.session_state.df is not None:
                 model = RandomForestClassifier(n_estimators=100, random_state=42)
 
             model.fit(X_train_tfidf, y_train)
-            preds = model.predict(X_test_tfidf)
+            
+            # Predict on the entire dataset
+            X_full_tfidf = tfidf.transform(X)
+            full_preds = model.predict(X_full_tfidf)
 
-        elif model_choice == "CNN":
+        elif model_choice in ["CNN", "LSTM"]:
             tokenizer = Tokenizer(num_words=5000, oov_token="<OOV>")
             tokenizer.fit_on_texts(X_train_text)
-            X_train_seq = tokenizer.texts_to_sequences(X_train_text)
-            X_test_seq = tokenizer.texts_to_sequences(X_test_text)
-
+            
             max_len = 50
-            X_train_pad = pad_sequences(X_train_seq, maxlen=max_len, padding="post", truncating="post")
-            X_test_pad = pad_sequences(X_test_seq, maxlen=max_len, padding="post", truncating="post")
+            X_train_pad = pad_sequences(tokenizer.texts_to_sequences(X_train_text), maxlen=max_len, padding="post", truncating="post")
 
             vocab_size = min(5000, len(tokenizer.word_index) + 1)
-            model = Sequential([
-                Embedding(vocab_size, 100, input_length=max_len),
-                Conv1D(128, 5, activation="relu"),
-                GlobalMaxPooling1D(),
-                Dense(64, activation="relu"),
-                Dense(len(label_encoder.classes_), activation="softmax")
-            ])
+            
+            if model_choice == "CNN":
+                model = Sequential([
+                    Embedding(vocab_size, 100, input_length=max_len),
+                    Conv1D(128, 5, activation="relu"), GlobalMaxPooling1D(),
+                    Dense(64, activation="relu"), Dense(len(label_encoder.classes_), activation="softmax")
+                ])
+            else: # LSTM
+                model = Sequential([
+                    Embedding(vocab_size, 100, input_length=max_len),
+                    LSTM(128, dropout=0.2), Dense(64, activation="relu"),
+                    Dense(len(label_encoder.classes_), activation="softmax")
+                ])
+
             model.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
             model.fit(X_train_pad, y_train, epochs=3, batch_size=32, validation_split=0.1, verbose=0)
-            preds = np.argmax(model.predict(X_test_pad), axis=1)
+            
+            # Predict on the entire dataset
+            X_full_seq = tokenizer.texts_to_sequences(X)
+            X_full_pad = pad_sequences(X_full_seq, maxlen=max_len, padding="post", truncating="post")
+            full_preds = np.argmax(model.predict(X_full_pad), axis=1)
 
-        elif model_choice == "LSTM":
-            tokenizer = Tokenizer(num_words=5000, oov_token="<OOV>")
-            tokenizer.fit_on_texts(X_train_text)
-            X_train_seq = tokenizer.texts_to_sequences(X_train_text)
-            X_test_seq = tokenizer.texts_to_sequences(X_test_text)
+        # --- ⭐ NEW: Displaying results for the ENTIRE dataset ---
+        if full_preds is not None:
+            st.header("Full Dataset Classification Results")
+            st.info("Yeh aapke poore dataset (100%) ka result hai, jismein har row ke liye prediction dikhaya gaya hai.")
 
-            max_len = 50
-            X_train_pad = pad_sequences(X_train_seq, maxlen=max_len, padding="post", truncating="post")
-            X_test_pad = pad_sequences(X_test_seq, maxlen=max_len, padding="post", truncating="post")
+            # Calculate overall accuracy
+            overall_acc = accuracy_score(y, full_preds)
+            st.success(f"Overall Accuracy on Full Dataset: {overall_acc:.2f}")
 
-            vocab_size = min(5000, len(tokenizer.word_index) + 1)
-            model = Sequential([
-                Embedding(vocab_size, 100, input_length=max_len),
-                LSTM(128, dropout=0.2),
-                Dense(64, activation="relu"),
-                Dense(len(label_encoder.classes_), activation="softmax")
-            ])
-            model.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
-            model.fit(X_train_pad, y_train, epochs=3, batch_size=32, validation_split=0.1, verbose=0)
-            preds = np.argmax(model.predict(X_test_pad), axis=1)
-
-        if preds is not None:
-            acc = accuracy_score(y_test, preds)
-            st.success(f"{model_choice} Accuracy: {acc:.2f}")
-
-            st.text(classification_report(
-                y_test,
-                preds,
-                labels=np.arange(len(label_encoder.classes_)),
-                target_names=label_encoder.classes_
-            ))
-
-            results_df = pd.DataFrame({
-                "RequirementText": X_test_text,
-                "Actual": label_encoder.inverse_transform(y_test),
-                "Predicted": label_encoder.inverse_transform(preds)
+            # Create a DataFrame with full results
+            full_results_df = pd.DataFrame({
+                "RequirementText": df["RequirementText"].values, # Original text
+                "Actual Label": label_encoder.inverse_transform(y),
+                "Predicted Label": label_encoder.inverse_transform(full_preds)
             })
 
-            st.dataframe(results_df)
+            # Display the full results table
+            st.dataframe(full_results_df)
 
+            # Add a download button for the full results
             st.download_button(
                 "Download Full Results",
-                results_df.to_csv(index=False),
-                "results.csv",
+                full_results_df.to_csv(index=False).encode('utf-8'),
+                "full_classification_results.csv",
                 "text/csv"
             )
-
 
 
 # import streamlit as st
