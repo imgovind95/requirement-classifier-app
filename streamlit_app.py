@@ -178,7 +178,7 @@ import pandas as pd
 import numpy as np
 import re
 import google.generativeai as genai
-from io import StringIO
+from io import StringIO, BytesIO
 
 from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -223,53 +223,67 @@ def fix_columns(df):
     return df
 
 # ----------------------------
-# Step 1: Prompt for dataset
+# Step 0: Local file upload
 # ----------------------------
-prompt = st.text_area(
-    "Write your prompt for dataset (CSV format):",
-    "Generate 20 software requirements in CSV format with EXACTLY 2 columns: RequirementText and NFR. "
-    "Each row must have exactly 2 fields. Do not use commas or quotes inside the RequirementText or NFR fields. "
-    "Separate columns using a comma. Each row must be on a new line. Output only CSV content, no extra explanation or text."
+uploaded_file = st.file_uploader(
+    "Upload your dataset (CSV/TSV) or leave empty to generate via Gemini API:",
+    type=["csv", "tsv"]
 )
-
-gen_button = st.button("Generate Dataset")
 
 df = None
 
-if gen_button and prompt:
+if uploaded_file is not None:
     try:
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        response = model.generate_content(prompt)
-        raw_text = response.text
+        df = pd.read_csv(uploaded_file)
+    except pd.errors.ParserError:
+        df = pd.read_csv(uploaded_file, sep="\t")
+    df = fix_columns(df)
+    if "RequirementText" not in df.columns or "NFR" not in df.columns:
+        st.error("Uploaded file missing 'RequirementText' or 'NFR'.")
+    else:
+        df["cleaned"] = df["RequirementText"].apply(clean_text)
+        st.success("Uploaded dataset loaded successfully")
+        st.dataframe(df.head())
 
-        # ----------------------------
-        # Robust CSV parsing with fallback
-        # ----------------------------
+# ----------------------------
+# Step 1: Prompt for dataset (only if no file uploaded)
+# ----------------------------
+if uploaded_file is None:
+    prompt = st.text_area(
+        "Write your prompt for dataset (CSV format):",
+        "Generate 20 software requirements in CSV format with EXACTLY 2 columns: RequirementText and NFR. "
+        "Each row must have exactly 2 fields. Do not use commas or quotes inside the RequirementText or NFR fields. "
+        "Separate columns using a comma. Each row must be on a new line. Output only CSV content, no extra explanation or text."
+    )
+    gen_button = st.button("Generate Dataset via Gemini API")
+
+    if gen_button and prompt:
         try:
-            df = pd.read_csv(StringIO(raw_text))
-        except pd.errors.ParserError:
-            df = pd.read_csv(StringIO(raw_text), sep="\t")
+            model = genai.GenerativeModel("gemini-1.5-flash")
+            response = model.generate_content(prompt)
+            raw_text = response.text
 
-        df = fix_columns(df)
+            try:
+                df = pd.read_csv(StringIO(raw_text))
+            except pd.errors.ParserError:
+                df = pd.read_csv(StringIO(raw_text), sep="\t")
 
-        if "RequirementText" not in df.columns or "NFR" not in df.columns:
-            st.error("Dataset missing 'RequirementText' or 'NFR'. Please refine your prompt.")
-        else:
-            df["cleaned"] = df["RequirementText"].apply(clean_text)
+            df = fix_columns(df)
+            if "RequirementText" not in df.columns or "NFR" not in df.columns:
+                st.error("Dataset missing 'RequirementText' or 'NFR'. Please refine your prompt.")
+            else:
+                df["cleaned"] = df["RequirementText"].apply(clean_text)
+                st.success("Dataset generated successfully via Gemini API")
+                st.dataframe(df.head())
 
-            st.success("Dataset generated successfully")
-            st.write("Detected columns:", df.columns.tolist())
-            st.dataframe(df.head())
-
-            st.download_button(
-                "Download Generated Dataset",
-                df.to_csv(index=False),
-                "generated_dataset.csv",
-                "text/csv"
-            )
-
-    except Exception as e:
-        st.error(f"Error while generating dataset: {e}")
+                st.download_button(
+                    "Download Generated Dataset",
+                    df.to_csv(index=False),
+                    "generated_dataset.csv",
+                    "text/csv"
+                )
+        except Exception as e:
+            st.error(f"Error while generating dataset: {e}")
 
 # ----------------------------
 # Step 2: Train Models
@@ -289,7 +303,6 @@ if df is not None and "RequirementText" in df.columns and "NFR" in df.columns:
     if run_button:
         preds = None
 
-        # Traditional ML models
         if model_choice in ["Naive Bayes", "SVM", "Random Forest"]:
             tfidf = TfidfVectorizer(max_features=5000)
             X_train_tfidf = tfidf.fit_transform(X_train_text)
@@ -305,13 +318,11 @@ if df is not None and "RequirementText" in df.columns and "NFR" in df.columns:
             model.fit(X_train_tfidf, y_train)
             preds = model.predict(X_test_tfidf)
 
-        # CNN
         elif model_choice == "CNN":
             tokenizer = Tokenizer(num_words=5000, oov_token="<OOV>")
             tokenizer.fit_on_texts(X_train_text)
             X_train_seq = tokenizer.texts_to_sequences(X_train_text)
             X_test_seq = tokenizer.texts_to_sequences(X_test_text)
-
             max_len = 50
             X_train_pad = pad_sequences(X_train_seq, maxlen=max_len, padding="post", truncating="post")
             X_test_pad = pad_sequences(X_test_seq, maxlen=max_len, padding="post", truncating="post")
@@ -328,13 +339,11 @@ if df is not None and "RequirementText" in df.columns and "NFR" in df.columns:
             model.fit(X_train_pad, y_train, epochs=3, batch_size=32, validation_split=0.1, verbose=0)
             preds = np.argmax(model.predict(X_test_pad), axis=1)
 
-        # LSTM
         elif model_choice == "LSTM":
             tokenizer = Tokenizer(num_words=5000, oov_token="<OOV>")
             tokenizer.fit_on_texts(X_train_text)
             X_train_seq = tokenizer.texts_to_sequences(X_train_text)
             X_test_seq = tokenizer.texts_to_sequences(X_test_text)
-
             max_len = 50
             X_train_pad = pad_sequences(X_train_seq, maxlen=max_len, padding="post", truncating="post")
             X_test_pad = pad_sequences(X_test_seq, maxlen=max_len, padding="post", truncating="post")
@@ -350,7 +359,6 @@ if df is not None and "RequirementText" in df.columns and "NFR" in df.columns:
             model.fit(X_train_pad, y_train, epochs=3, batch_size=32, validation_split=0.1, verbose=0)
             preds = np.argmax(model.predict(X_test_pad), axis=1)
 
-        # Show results
         if preds is not None:
             acc = accuracy_score(y_test, preds)
             st.success(f"{model_choice} Accuracy: {acc:.2f}")
@@ -369,7 +377,6 @@ if df is not None and "RequirementText" in df.columns and "NFR" in df.columns:
             })
 
             st.dataframe(results_df)
-
             st.download_button(
                 "Download Full Results",
                 results_df.to_csv(index=False),
