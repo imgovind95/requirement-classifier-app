@@ -173,227 +173,6 @@
 #                 "text/csv"
 #             )
 
-# import streamlit as st
-# import pandas as pd
-# import numpy as np
-# import re
-# import google.generativeai as genai
-# from io import StringIO
-
-# from sklearn.model_selection import train_test_split
-# from sklearn.feature_extraction.text import TfidfVectorizer
-# from sklearn.preprocessing import LabelEncoder
-# from sklearn.metrics import classification_report, accuracy_score
-# from sklearn.naive_bayes import MultinomialNB
-# from sklearn.svm import SVC
-# from sklearn.ensemble import RandomForestClassifier
-
-# import tensorflow as tf
-# from tensorflow.keras.preprocessing.text import Tokenizer
-# from tensorflow.keras.preprocessing.sequence import pad_sequences
-# from tensorflow.keras.models import Sequential
-# from tensorflow.keras.layers import Embedding, Conv1D, GlobalMaxPooling1D, LSTM, Dense
-
-# # ----------------------------
-# # Gemini API setup using Secrets
-# # ----------------------------
-# genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-
-# st.title("Requirement Classification App Dataset Builder")
-
-# # ----------------------------
-# # Helpers
-# # ----------------------------
-# def clean_text(text):
-#     text = str(text).lower()
-#     text = re.sub(r"[^a-z0-9\s]", " ", text)
-#     return re.sub(r"\s+", " ", text).strip()
-
-# def fix_columns(df):
-#     rename_map = {}
-#     if "RequirementText" not in df.columns:
-#         for col in df.columns:
-#             if "require" in col.lower():
-#                 rename_map[col] = "RequirementText"
-#     if "NFR" not in df.columns:
-#         for col in df.columns:
-#             if "nfr" in col.lower() or "label" in col.lower() or "type" in col.lower():
-#                 rename_map[col] = "NFR"
-#     df.rename(columns=rename_map, inplace=True)
-#     return df
-
-# # ----------------------------
-# # Initialize session state
-# # ----------------------------
-# if "df" not in st.session_state:
-#     st.session_state.df = None
-
-# # ----------------------------
-# # Step 0: Local file upload
-# # ----------------------------
-# uploaded_file = st.file_uploader(
-#     "Upload your dataset (CSV/TSV) or leave empty to generate :",
-#     type=["csv", "tsv"]
-# )
-
-# if uploaded_file is not None:
-#     try:
-#         df = pd.read_csv(uploaded_file)
-#     except pd.errors.ParserError:
-#         df = pd.read_csv(uploaded_file, sep="\t")
-#     df = fix_columns(df)
-#     if "RequirementText" not in df.columns or "NFR" not in df.columns:
-#         st.error("Uploaded file missing 'RequirementText' or 'NFR'.")
-#     else:
-#         df["cleaned"] = df["RequirementText"].apply(clean_text)
-#         st.session_state.df = df
-#         st.success("Uploaded dataset loaded successfully")
-#         st.dataframe(df.head())
-
-# # ----------------------------
-# # Step 1: Gemini dataset generation
-# # ----------------------------
-# if st.session_state.df is None:
-#     num_rows = st.number_input(
-#         "How many requirements to generate?", min_value=1, value=20, step=1
-#     )
-
-#     prompt = st.text_area(
-#         "Write your prompt for dataset (CSV format):",
-#         f"Generate {num_rows} software requirements in CSV format with EXACTLY 2 columns: RequirementText and NFR. "
-#         "Each row must have exactly 2 fields. Do not use commas or quotes inside the RequirementText or NFR fields. "
-#         "Separate columns using a comma. Each row must be on a new line. Output only CSV content, no extra explanation or text."
-#     )
-
-#     gen_button = st.button("Generate Dataset")
-
-#     if gen_button and prompt:
-#         try:
-#             model = genai.GenerativeModel("gemini-1.5-flash")
-#             response = model.generate_content(prompt)
-#             raw_text = response.text
-
-#             # Ensure only lines with exactly 2 fields are used
-#             lines = raw_text.strip().split("\n")
-#             csv_lines = [line for line in lines if len(line.split(",")) == 2]
-#             csv_text = "\n".join(csv_lines)
-
-#             df = pd.read_csv(StringIO(csv_text), names=["RequirementText", "NFR"])
-#             df = fix_columns(df)
-
-#             if "RequirementText" not in df.columns or "NFR" not in df.columns:
-#                 st.error("Dataset missing 'RequirementText' or 'NFR'. Please refine your prompt.")
-#             else:
-#                 df["cleaned"] = df["RequirementText"].apply(clean_text)
-#                 st.session_state.df = df
-#                 st.success("Dataset generated successfully via Gemini API")
-#                 st.dataframe(df.head())
-
-#         except Exception as e:
-#             st.error(f"Error while generating dataset: {e}")
-
-# # ----------------------------
-# # Step 2: Train Models
-# # ----------------------------
-# if st.session_state.df is not None:
-#     df = st.session_state.df
-#     label_encoder = LabelEncoder()
-#     y = label_encoder.fit_transform(df["NFR"].astype(str))
-#     X = df["cleaned"].values
-
-#     X_train_text, X_test_text, y_train, y_test = train_test_split(
-#         X, y, test_size=0.2, random_state=42
-#     )
-
-#     model_choice = st.selectbox("Choose Model", ["Naive Bayes", "SVM", "Random Forest", "CNN", "LSTM"])
-#     run_button = st.button("Run Model")
-
-#     if run_button:
-#         preds = None
-
-#         if model_choice in ["Naive Bayes", "SVM", "Random Forest"]:
-#             tfidf = TfidfVectorizer(max_features=5000)
-#             X_train_tfidf = tfidf.fit_transform(X_train_text)
-#             X_test_tfidf = tfidf.transform(X_test_text)
-
-#             if model_choice == "Naive Bayes":
-#                 model = MultinomialNB()
-#             elif model_choice == "SVM":
-#                 model = SVC(kernel="linear", random_state=42)
-#             else:
-#                 model = RandomForestClassifier(n_estimators=100, random_state=42)
-
-#             model.fit(X_train_tfidf, y_train)
-#             preds = model.predict(X_test_tfidf)
-
-#         elif model_choice == "CNN":
-#             tokenizer = Tokenizer(num_words=5000, oov_token="<OOV>")
-#             tokenizer.fit_on_texts(X_train_text)
-#             X_train_seq = tokenizer.texts_to_sequences(X_train_text)
-#             X_test_seq = tokenizer.texts_to_sequences(X_test_text)
-
-#             max_len = 50
-#             X_train_pad = pad_sequences(X_train_seq, maxlen=max_len, padding="post", truncating="post")
-#             X_test_pad = pad_sequences(X_test_seq, maxlen=max_len, padding="post", truncating="post")
-
-#             vocab_size = min(5000, len(tokenizer.word_index) + 1)
-#             model = Sequential([
-#                 Embedding(vocab_size, 100, input_length=max_len),
-#                 Conv1D(128, 5, activation="relu"),
-#                 GlobalMaxPooling1D(),
-#                 Dense(64, activation="relu"),
-#                 Dense(len(label_encoder.classes_), activation="softmax")
-#             ])
-#             model.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
-#             model.fit(X_train_pad, y_train, epochs=3, batch_size=32, validation_split=0.1, verbose=0)
-#             preds = np.argmax(model.predict(X_test_pad), axis=1)
-
-#         elif model_choice == "LSTM":
-#             tokenizer = Tokenizer(num_words=5000, oov_token="<OOV>")
-#             tokenizer.fit_on_texts(X_train_text)
-#             X_train_seq = tokenizer.texts_to_sequences(X_train_text)
-#             X_test_seq = tokenizer.texts_to_sequences(X_test_text)
-
-#             max_len = 50
-#             X_train_pad = pad_sequences(X_train_seq, maxlen=max_len, padding="post", truncating="post")
-#             X_test_pad = pad_sequences(X_test_seq, maxlen=max_len, padding="post", truncating="post")
-
-#             vocab_size = min(5000, len(tokenizer.word_index) + 1)
-#             model = Sequential([
-#                 Embedding(vocab_size, 100, input_length=max_len),
-#                 LSTM(128, dropout=0.2),
-#                 Dense(64, activation="relu"),
-#                 Dense(len(label_encoder.classes_), activation="softmax")
-#             ])
-#             model.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
-#             model.fit(X_train_pad, y_train, epochs=3, batch_size=32, validation_split=0.1, verbose=0)
-#             preds = np.argmax(model.predict(X_test_pad), axis=1)
-
-#         if preds is not None:
-#             acc = accuracy_score(y_test, preds)
-#             st.success(f"{model_choice} Accuracy: {acc:.2f}")
-
-#             st.text(classification_report(
-#                 y_test,
-#                 preds,
-#                 labels=np.arange(len(label_encoder.classes_)),
-#                 target_names=label_encoder.classes_
-#             ))
-
-#             results_df = pd.DataFrame({
-#                 "RequirementText": X_test_text,
-#                 "Actual": label_encoder.inverse_transform(y_test),
-#                 "Predicted": label_encoder.inverse_transform(preds)
-#             })
-
-#             st.dataframe(results_df)
-
-#             st.download_button(
-#                 "Download Full Results",
-#                 results_df.to_csv(index=False),
-#                 "results.csv",
-#                 "text/csv"
-#             )
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -430,6 +209,19 @@ def clean_text(text):
     text = re.sub(r"[^a-z0-9\s]", " ", text)
     return re.sub(r"\s+", " ", text).strip()
 
+def fix_columns(df):
+    rename_map = {}
+    if "RequirementText" not in df.columns:
+        for col in df.columns:
+            if "require" in col.lower():
+                rename_map[col] = "RequirementText"
+    if "NFR" not in df.columns:
+        for col in df.columns:
+            if "nfr" in col.lower() or "label" in col.lower() or "type" in col.lower():
+                rename_map[col] = "NFR"
+    df.rename(columns=rename_map, inplace=True)
+    return df
+
 # ----------------------------
 # Initialize session state
 # ----------------------------
@@ -437,10 +229,10 @@ if "df" not in st.session_state:
     st.session_state.df = None
 
 # ----------------------------
-# Step 0: Upload dataset
+# Step 0: Local file upload
 # ----------------------------
 uploaded_file = st.file_uploader(
-    "Upload your dataset (CSV/TSV). If empty, dataset will be generated using Gemini:",
+    "Upload your dataset (CSV/TSV) or leave empty to generate :",
     type=["csv", "tsv"]
 )
 
@@ -449,9 +241,9 @@ if uploaded_file is not None:
         df = pd.read_csv(uploaded_file)
     except pd.errors.ParserError:
         df = pd.read_csv(uploaded_file, sep="\t")
-
+    df = fix_columns(df)
     if "RequirementText" not in df.columns or "NFR" not in df.columns:
-        st.error("Uploaded file must contain 'RequirementText' and 'NFR' columns.")
+        st.error("Uploaded file missing 'RequirementText' or 'NFR'.")
     else:
         df["cleaned"] = df["RequirementText"].apply(clean_text)
         st.session_state.df = df
@@ -459,41 +251,43 @@ if uploaded_file is not None:
         st.dataframe(df.head())
 
 # ----------------------------
-# Step 1: Gemini dataset generation (if no upload)
+# Step 1: Gemini dataset generation
 # ----------------------------
 if st.session_state.df is None:
     num_rows = st.number_input(
-        "How many rows to generate?", min_value=5, value=20, step=5
+        "How many requirements to generate?", min_value=1, value=20, step=1
     )
 
-    if st.button("Generate Dataset via Gemini"):
+    prompt = st.text_area(
+        "Write your prompt for dataset (CSV format):",
+        f"Generate {num_rows} software requirements in CSV format with EXACTLY 2 columns: RequirementText and NFR. "
+        "Each row must have exactly 2 fields. Do not use commas or quotes inside the RequirementText or NFR fields. "
+        "Separate columns using a comma. Each row must be on a new line. Output only CSV content, no extra explanation or text."
+    )
+
+    gen_button = st.button("Generate Dataset")
+
+    if gen_button and prompt:
         try:
             model = genai.GenerativeModel("gemini-1.5-flash")
-
-            prompt = f"""
-            Generate {num_rows} software requirement records in CSV format
-            with EXACTLY these two columns: RequirementText, NFR.
-            - 'RequirementText' must contain realistic requirement statements.
-            - 'NFR' must contain the type/label of the requirement (like Performance, Security, Usability etc).
-            - Each row must have exactly 2 values separated by a comma.
-            - Do not add commas or quotes inside the fields.
-            - Output only raw CSV rows (no explanation).
-            """
-
             response = model.generate_content(prompt)
-            raw_text = response.text.strip()
+            raw_text = response.text
 
-            # Keep only valid rows with 2 columns
-            lines = raw_text.split("\n")
+            # Ensure only lines with exactly 2 fields are used
+            lines = raw_text.strip().split("\n")
             csv_lines = [line for line in lines if len(line.split(",")) == 2]
             csv_text = "\n".join(csv_lines)
 
             df = pd.read_csv(StringIO(csv_text), names=["RequirementText", "NFR"])
-            df["cleaned"] = df["RequirementText"].apply(clean_text)
+            df = fix_columns(df)
 
-            st.session_state.df = df
-            st.success("Dataset generated successfully via Gemini API")
-            st.dataframe(df.head())
+            if "RequirementText" not in df.columns or "NFR" not in df.columns:
+                st.error("Dataset missing 'RequirementText' or 'NFR'. Please refine your prompt.")
+            else:
+                df["cleaned"] = df["RequirementText"].apply(clean_text)
+                st.session_state.df = df
+                st.success("Dataset generated successfully via Gemini API")
+                st.dataframe(df.head())
 
         except Exception as e:
             st.error(f"Error while generating dataset: {e}")
@@ -600,6 +394,212 @@ if st.session_state.df is not None:
                 "results.csv",
                 "text/csv"
             )
+# import streamlit as st
+# import pandas as pd
+# import numpy as np
+# import re
+# import google.generativeai as genai
+# from io import StringIO
+
+# from sklearn.model_selection import train_test_split
+# from sklearn.feature_extraction.text import TfidfVectorizer
+# from sklearn.preprocessing import LabelEncoder
+# from sklearn.metrics import classification_report, accuracy_score
+# from sklearn.naive_bayes import MultinomialNB
+# from sklearn.svm import SVC
+# from sklearn.ensemble import RandomForestClassifier
+
+# import tensorflow as tf
+# from tensorflow.keras.preprocessing.text import Tokenizer
+# from tensorflow.keras.preprocessing.sequence import pad_sequences
+# from tensorflow.keras.models import Sequential
+# from tensorflow.keras.layers import Embedding, Conv1D, GlobalMaxPooling1D, LSTM, Dense
+
+# # ----------------------------
+# # Gemini API setup using Secrets
+# # ----------------------------
+# genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+
+# st.title("Requirement Classification App Dataset Builder")
+
+# # ----------------------------
+# # Helpers
+# # ----------------------------
+# def clean_text(text):
+#     text = str(text).lower()
+#     text = re.sub(r"[^a-z0-9\s]", " ", text)
+#     return re.sub(r"\s+", " ", text).strip()
+
+# # ----------------------------
+# # Initialize session state
+# # ----------------------------
+# if "df" not in st.session_state:
+#     st.session_state.df = None
+
+# # ----------------------------
+# # Step 0: Upload dataset
+# # ----------------------------
+# uploaded_file = st.file_uploader(
+#     "Upload your dataset (CSV/TSV). If empty, dataset will be generated using Gemini:",
+#     type=["csv", "tsv"]
+# )
+
+# if uploaded_file is not None:
+#     try:
+#         df = pd.read_csv(uploaded_file)
+#     except pd.errors.ParserError:
+#         df = pd.read_csv(uploaded_file, sep="\t")
+
+#     if "RequirementText" not in df.columns or "NFR" not in df.columns:
+#         st.error("Uploaded file must contain 'RequirementText' and 'NFR' columns.")
+#     else:
+#         df["cleaned"] = df["RequirementText"].apply(clean_text)
+#         st.session_state.df = df
+#         st.success("Uploaded dataset loaded successfully")
+#         st.dataframe(df.head())
+
+# # ----------------------------
+# # Step 1: Gemini dataset generation (if no upload)
+# # ----------------------------
+# if st.session_state.df is None:
+#     num_rows = st.number_input(
+#         "How many rows to generate?", min_value=5, value=20, step=5
+#     )
+
+#     if st.button("Generate Dataset via Gemini"):
+#         try:
+#             model = genai.GenerativeModel("gemini-1.5-flash")
+
+#             prompt = f"""
+#             Generate {num_rows} software requirement records in CSV format
+#             with EXACTLY these two columns: RequirementText, NFR.
+#             - 'RequirementText' must contain realistic requirement statements.
+#             - 'NFR' must contain the type/label of the requirement (like Performance, Security, Usability etc).
+#             - Each row must have exactly 2 values separated by a comma.
+#             - Do not add commas or quotes inside the fields.
+#             - Output only raw CSV rows (no explanation).
+#             """
+
+#             response = model.generate_content(prompt)
+#             raw_text = response.text.strip()
+
+#             # Keep only valid rows with 2 columns
+#             lines = raw_text.split("\n")
+#             csv_lines = [line for line in lines if len(line.split(",")) == 2]
+#             csv_text = "\n".join(csv_lines)
+
+#             df = pd.read_csv(StringIO(csv_text), names=["RequirementText", "NFR"])
+#             df["cleaned"] = df["RequirementText"].apply(clean_text)
+
+#             st.session_state.df = df
+#             st.success("Dataset generated successfully via Gemini API")
+#             st.dataframe(df.head())
+
+#         except Exception as e:
+#             st.error(f"Error while generating dataset: {e}")
+
+# # ----------------------------
+# # Step 2: Train Models
+# # ----------------------------
+# if st.session_state.df is not None:
+#     df = st.session_state.df
+#     label_encoder = LabelEncoder()
+#     y = label_encoder.fit_transform(df["NFR"].astype(str))
+#     X = df["cleaned"].values
+
+#     X_train_text, X_test_text, y_train, y_test = train_test_split(
+#         X, y, test_size=0.2, random_state=42
+#     )
+
+#     model_choice = st.selectbox("Choose Model", ["Naive Bayes", "SVM", "Random Forest", "CNN", "LSTM"])
+#     run_button = st.button("Run Model")
+
+#     if run_button:
+#         preds = None
+
+#         if model_choice in ["Naive Bayes", "SVM", "Random Forest"]:
+#             tfidf = TfidfVectorizer(max_features=5000)
+#             X_train_tfidf = tfidf.fit_transform(X_train_text)
+#             X_test_tfidf = tfidf.transform(X_test_text)
+
+#             if model_choice == "Naive Bayes":
+#                 model = MultinomialNB()
+#             elif model_choice == "SVM":
+#                 model = SVC(kernel="linear", random_state=42)
+#             else:
+#                 model = RandomForestClassifier(n_estimators=100, random_state=42)
+
+#             model.fit(X_train_tfidf, y_train)
+#             preds = model.predict(X_test_tfidf)
+
+#         elif model_choice == "CNN":
+#             tokenizer = Tokenizer(num_words=5000, oov_token="<OOV>")
+#             tokenizer.fit_on_texts(X_train_text)
+#             X_train_seq = tokenizer.texts_to_sequences(X_train_text)
+#             X_test_seq = tokenizer.texts_to_sequences(X_test_text)
+
+#             max_len = 50
+#             X_train_pad = pad_sequences(X_train_seq, maxlen=max_len, padding="post", truncating="post")
+#             X_test_pad = pad_sequences(X_test_seq, maxlen=max_len, padding="post", truncating="post")
+
+#             vocab_size = min(5000, len(tokenizer.word_index) + 1)
+#             model = Sequential([
+#                 Embedding(vocab_size, 100, input_length=max_len),
+#                 Conv1D(128, 5, activation="relu"),
+#                 GlobalMaxPooling1D(),
+#                 Dense(64, activation="relu"),
+#                 Dense(len(label_encoder.classes_), activation="softmax")
+#             ])
+#             model.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
+#             model.fit(X_train_pad, y_train, epochs=3, batch_size=32, validation_split=0.1, verbose=0)
+#             preds = np.argmax(model.predict(X_test_pad), axis=1)
+
+#         elif model_choice == "LSTM":
+#             tokenizer = Tokenizer(num_words=5000, oov_token="<OOV>")
+#             tokenizer.fit_on_texts(X_train_text)
+#             X_train_seq = tokenizer.texts_to_sequences(X_train_text)
+#             X_test_seq = tokenizer.texts_to_sequences(X_test_text)
+
+#             max_len = 50
+#             X_train_pad = pad_sequences(X_train_seq, maxlen=max_len, padding="post", truncating="post")
+#             X_test_pad = pad_sequences(X_test_seq, maxlen=max_len, padding="post", truncating="post")
+
+#             vocab_size = min(5000, len(tokenizer.word_index) + 1)
+#             model = Sequential([
+#                 Embedding(vocab_size, 100, input_length=max_len),
+#                 LSTM(128, dropout=0.2),
+#                 Dense(64, activation="relu"),
+#                 Dense(len(label_encoder.classes_), activation="softmax")
+#             ])
+#             model.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
+#             model.fit(X_train_pad, y_train, epochs=3, batch_size=32, validation_split=0.1, verbose=0)
+#             preds = np.argmax(model.predict(X_test_pad), axis=1)
+
+#         if preds is not None:
+#             acc = accuracy_score(y_test, preds)
+#             st.success(f"{model_choice} Accuracy: {acc:.2f}")
+
+#             st.text(classification_report(
+#                 y_test,
+#                 preds,
+#                 labels=np.arange(len(label_encoder.classes_)),
+#                 target_names=label_encoder.classes_
+#             ))
+
+#             results_df = pd.DataFrame({
+#                 "RequirementText": X_test_text,
+#                 "Actual": label_encoder.inverse_transform(y_test),
+#                 "Predicted": label_encoder.inverse_transform(preds)
+#             })
+
+#             st.dataframe(results_df)
+
+#             st.download_button(
+#                 "Download Full Results",
+#                 results_df.to_csv(index=False),
+#                 "results.csv",
+#                 "text/csv"
+#             )
 
 
 
