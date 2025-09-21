@@ -860,17 +860,10 @@ if st.session_state.df is not None:
     st.header("Train a Model")
     df = st.session_state.df
 
-    # --- ⭐ NEW (AUTOMATIC) CODE START ---
-    
-    # Humne yahan functional requirements ke possible labels ki ek list bana di hai.
-    # Aap is list mein aur bhi labels, jaise 'FR', add kar sakte hain.
+    # --- Automatic label detection code ---
     functional_labels = ['functionality', '0'] 
-
     st.info(f"Automatically identifying labels like {functional_labels} as 'Functional'.")
 
-    # Ek naya column banayein jismein sirf do tarah ke label honge.
-    # Agar label functional_labels waali list mein hai, toh usko 'Functional' rakho.
-    # Agar label list mein nahi hai, toh usko 'Non-Functional' bana do.
     df['Binary_NFR'] = df['NFR'].apply(
         lambda label: 'Functional' if str(label).strip().lower() in functional_labels else 'Non-Functional'
     )
@@ -879,20 +872,23 @@ if st.session_state.df is not None:
     st.dataframe(df[['RequirementText', 'NFR', 'Binary_NFR']].head())
     
     label_encoder = LabelEncoder()
-    # Ab hum naye 'Binary_NFR' column par model ko train karenge
     y = label_encoder.fit_transform(df["Binary_NFR"]) 
     X = df["cleaned"].values
-    # --- ⭐ NEW CODE END ---
+    # --- End of automatic code ---
 
+    # --- ⭐ CORRECTION IS HERE ---
+    # We add stratify=y to ensure both train and test sets have a balanced mix of labels.
     X_train_text, X_test_text, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42
+        X, y, test_size=0.2, random_state=42, stratify=y 
     )
+    # --- ⭐ END OF CORRECTION ---
 
     model_choice = st.selectbox("Choose Model", ["Naive Bayes", "SVM", "Random Forest", "CNN", "LSTM"])
     run_button = st.button("Run Model")
 
     if run_button:
         # (The rest of your 'if run_button:' code remains exactly the same)
+        # ... (baaki ka code waisa hi rahega) ...
         preds = None
         full_preds = None 
 
