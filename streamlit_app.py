@@ -65,7 +65,7 @@ if uploaded_file is not None:
     X_train_text, X_test_text, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
     # Model Selection
-    model_choice = st.selectbox("Choose Model", ["Naive Bayes", "SVM", "Random Forest", "CNN", "LSTM", "Zero-Shot BART"])
+    model_choice = st.selectbox("Choose Model", ["Naive Bayes", "SVM", "Random Forest", "CNN", "LSTM"])
     run_button = st.button("Run Model")
 
     if run_button:
