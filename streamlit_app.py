@@ -255,7 +255,7 @@ if uploaded_file is None:
         "Each row must have exactly 2 fields. Do not use commas or quotes inside the RequirementText or NFR fields. "
         "Separate columns using a comma. Each row must be on a new line. Output only CSV content, no extra explanation or text."
     )
-    gen_button = st.button("Generate Dataset via Gemini API")
+    gen_button = st.button("Generate Dataset ")
 
     if gen_button and prompt:
         try:
