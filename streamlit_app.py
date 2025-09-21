@@ -195,9 +195,9 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Embedding, Conv1D, GlobalMaxPooling1D, LSTM, Dense
 
 # ----------------------------
-# Gemini API setup
+# Gemini API setup using Secrets
 # ----------------------------
-genai.configure(api_key=st.secrets["AIzaSyByKSIsncltKAAhIg1NH7pPSCfGRqctxWc"])
+genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 
 st.title("Requirement Classification App with Gemini Dataset Builder")
 
