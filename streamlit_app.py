@@ -394,6 +394,205 @@
 #                 "results.csv",
 #                 "text/csv"
 #             )
+# import streamlit as st
+# import pandas as pd
+# import numpy as np
+# import re
+# import google.generativeai as genai
+# from io import StringIO
+
+# from sklearn.model_selection import train_test_split
+# from sklearn.feature_extraction.text import TfidfVectorizer
+# from sklearn.preprocessing import LabelEncoder
+# from sklearn.metrics import classification_report, accuracy_score
+# from sklearn.naive_bayes import MultinomialNB
+# from sklearn.svm import SVC
+# from sklearn.ensemble import RandomForestClassifier
+
+# import tensorflow as tf
+# from tensorflow.keras.preprocessing.text import Tokenizer
+# from tensorflow.keras.preprocessing.sequence import pad_sequences
+# from tensorflow.keras.models import Sequential
+# from tensorflow.keras.layers import Embedding, Conv1D, GlobalMaxPooling1D, LSTM, Dense
+
+# # ----------------------------
+# # Gemini API setup using Secrets
+# # ----------------------------
+# genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+
+# st.title("Requirement Classification App Dataset Builder")
+
+# # ----------------------------
+# # Helpers
+# # ----------------------------
+# def clean_text(text):
+#     text = str(text).lower()
+#     text = re.sub(r"[^a-z0-9\s]", " ", text)
+#     return re.sub(r"\s+", " ", text).strip()
+
+# # ----------------------------
+# # Initialize session state
+# # ----------------------------
+# if "df" not in st.session_state:
+#     st.session_state.df = None
+
+# # ----------------------------
+# # Step 0: Upload dataset
+# # ----------------------------
+# uploaded_file = st.file_uploader(
+#     "Upload your dataset (CSV/TSV) or leave empty to generate :",
+#     type=["csv", "tsv"]
+# )
+
+# if uploaded_file is not None:
+#     try:
+#         df = pd.read_csv(uploaded_file)
+#     except pd.errors.ParserError:
+#         df = pd.read_csv(uploaded_file, sep="\t")
+
+#     if "RequirementText" not in df.columns or "NFR" not in df.columns:
+#         st.error("Uploaded file must contain 'RequirementText' and 'NFR' columns.")
+#     else:
+#         df["cleaned"] = df["RequirementText"].apply(clean_text)
+#         st.session_state.df = df
+#         st.success("Uploaded dataset loaded successfully")
+#         st.dataframe(df.head())
+
+# # ----------------------------
+# # Step 1: Gemini dataset generation (if no upload)
+# # ----------------------------
+# if st.session_state.df is None:
+#     user_prompt = st.text_area(
+#         "Write your prompt for dataset (CSV format):",
+#         value="""Generate 20 software requirements in CSV format with EXACTLY 2 columns: RequirementText and NFR.
+# Each row must have exactly 2 fields. Do not use commas or quotes inside the RequirementText or NFR fields.
+# Separate columns using a comma. Each row must be on a new line. Output only CSV content, no extra explanation or text."""
+#     )
+
+#     if st.button("Generate Dataset"):
+#         try:
+#             model = genai.GenerativeModel("gemini-1.5-flash")
+#             response = model.generate_content(user_prompt)
+#             raw_text = response.text.strip()
+
+#             # Keep only valid rows with 2 columns
+#             lines = raw_text.split("\n")
+#             csv_lines = [line for line in lines if len(line.split(",")) == 2]
+#             csv_text = "\n".join(csv_lines)
+
+#             df = pd.read_csv(StringIO(csv_text), names=["RequirementText", "NFR"])
+#             df["cleaned"] = df["RequirementText"].apply(clean_text)
+
+#             st.session_state.df = df
+#             st.success("Dataset generated successfully via Gemini API")
+#             st.dataframe(df.head())
+
+#         except Exception as e:
+#             st.error(f"Error while generating dataset: {e}")
+
+# # ----------------------------
+# # Step 2: Train Models
+# # ----------------------------
+# if st.session_state.df is not None:
+#     df = st.session_state.df
+#     label_encoder = LabelEncoder()
+#     y = label_encoder.fit_transform(df["NFR"].astype(str))
+#     X = df["cleaned"].values
+
+#     X_train_text, X_test_text, y_train, y_test = train_test_split(
+#         X, y, test_size=0.2, random_state=42
+#     )
+
+#     model_choice = st.selectbox("Choose Model", ["Naive Bayes", "SVM", "Random Forest", "CNN", "LSTM"])
+#     run_button = st.button("Run Model")
+
+#     if run_button:
+#         preds = None
+
+#         if model_choice in ["Naive Bayes", "SVM", "Random Forest"]:
+#             tfidf = TfidfVectorizer(max_features=5000)
+#             X_train_tfidf = tfidf.fit_transform(X_train_text)
+#             X_test_tfidf = tfidf.transform(X_test_text)
+
+#             if model_choice == "Naive Bayes":
+#                 model = MultinomialNB()
+#             elif model_choice == "SVM":
+#                 model = SVC(kernel="linear", random_state=42)
+#             else:
+#                 model = RandomForestClassifier(n_estimators=100, random_state=42)
+
+#             model.fit(X_train_tfidf, y_train)
+#             preds = model.predict(X_test_tfidf)
+
+#         elif model_choice == "CNN":
+#             tokenizer = Tokenizer(num_words=5000, oov_token="<OOV>")
+#             tokenizer.fit_on_texts(X_train_text)
+#             X_train_seq = tokenizer.texts_to_sequences(X_train_text)
+#             X_test_seq = tokenizer.texts_to_sequences(X_test_text)
+
+#             max_len = 50
+#             X_train_pad = pad_sequences(X_train_seq, maxlen=max_len, padding="post", truncating="post")
+#             X_test_pad = pad_sequences(X_test_seq, maxlen=max_len, padding="post", truncating="post")
+
+#             vocab_size = min(5000, len(tokenizer.word_index) + 1)
+#             model = Sequential([
+#                 Embedding(vocab_size, 100, input_length=max_len),
+#                 Conv1D(128, 5, activation="relu"),
+#                 GlobalMaxPooling1D(),
+#                 Dense(64, activation="relu"),
+#                 Dense(len(label_encoder.classes_), activation="softmax")
+#             ])
+#             model.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
+#             model.fit(X_train_pad, y_train, epochs=3, batch_size=32, validation_split=0.1, verbose=0)
+#             preds = np.argmax(model.predict(X_test_pad), axis=1)
+
+#         elif model_choice == "LSTM":
+#             tokenizer = Tokenizer(num_words=5000, oov_token="<OOV>")
+#             tokenizer.fit_on_texts(X_train_text)
+#             X_train_seq = tokenizer.texts_to_sequences(X_train_text)
+#             X_test_seq = tokenizer.texts_to_sequences(X_test_text)
+
+#             max_len = 50
+#             X_train_pad = pad_sequences(X_train_seq, maxlen=max_len, padding="post", truncating="post")
+#             X_test_pad = pad_sequences(X_test_seq, maxlen=max_len, padding="post", truncating="post")
+
+#             vocab_size = min(5000, len(tokenizer.word_index) + 1)
+#             model = Sequential([
+#                 Embedding(vocab_size, 100, input_length=max_len),
+#                 LSTM(128, dropout=0.2),
+#                 Dense(64, activation="relu"),
+#                 Dense(len(label_encoder.classes_), activation="softmax")
+#             ])
+#             model.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
+#             model.fit(X_train_pad, y_train, epochs=3, batch_size=32, validation_split=0.1, verbose=0)
+#             preds = np.argmax(model.predict(X_test_pad), axis=1)
+
+#         if preds is not None:
+#             acc = accuracy_score(y_test, preds)
+#             st.success(f"{model_choice} Accuracy: {acc:.2f}")
+
+#             st.text(classification_report(
+#                 y_test,
+#                 preds,
+#                 labels=np.arange(len(label_encoder.classes_)),
+#                 target_names=label_encoder.classes_
+#             ))
+
+#             results_df = pd.DataFrame({
+#                 "RequirementText": X_test_text,
+#                 "Actual": label_encoder.inverse_transform(y_test),
+#                 "Predicted": label_encoder.inverse_transform(preds)
+#             })
+
+#             st.dataframe(results_df)
+
+#             st.download_button(
+#                 "Download Full Results",
+#                 results_df.to_csv(index=False),
+#                 "results.csv",
+#                 "text/csv"
+#             )
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -418,7 +617,13 @@ from tensorflow.keras.layers import Embedding, Conv1D, GlobalMaxPooling1D, LSTM,
 # ----------------------------
 # Gemini API setup using Secrets
 # ----------------------------
-genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+# It's recommended to handle API key errors gracefully
+try:
+    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+except (KeyError, AttributeError):
+    st.error("GEMINI_API_KEY not found in Streamlit secrets. Please add it.")
+    st.stop()
+
 
 st.title("Requirement Classification App Dataset Builder")
 
@@ -446,22 +651,48 @@ uploaded_file = st.file_uploader(
 
 if uploaded_file is not None:
     try:
-        df = pd.read_csv(uploaded_file)
-    except pd.errors.ParserError:
-        df = pd.read_csv(uploaded_file, sep="\t")
+        # Attempt to read as CSV, if it fails, try TSV
+        try:
+            df = pd.read_csv(uploaded_file)
+        except pd.errors.ParserError:
+            uploaded_file.seek(0) # Reset file pointer
+            df = pd.read_csv(uploaded_file, sep="\t")
 
-    if "RequirementText" not in df.columns or "NFR" not in df.columns:
-        st.error("Uploaded file must contain 'RequirementText' and 'NFR' columns.")
-    else:
-        df["cleaned"] = df["RequirementText"].apply(clean_text)
-        st.session_state.df = df
+        st.session_state.raw_df = df # Store the original dataframe
         st.success("Uploaded dataset loaded successfully")
         st.dataframe(df.head())
+
+    except Exception as e:
+        st.error(f"Error loading file: {e}")
+        st.session_state.raw_df = None
+
+
+# New section to allow column selection
+if "raw_df" in st.session_state and st.session_state.raw_df is not None:
+    df = st.session_state.raw_df
+    columns = df.columns.tolist()
+
+    st.subheader("Select Columns")
+    # Let the user select the text and label columns
+    text_column = st.selectbox("Select the column containing the requirement text:", columns)
+    nfr_column = st.selectbox("Select the column containing the NFR label:", columns)
+
+    if st.button("Confirm Columns and Process Data"):
+        # Create a new dataframe with the standard column names
+        processed_df = pd.DataFrame({
+            'RequirementText': df[text_column],
+            'NFR': df[nfr_column]
+        })
+        processed_df["cleaned"] = processed_df["RequirementText"].apply(clean_text)
+        st.session_state.df = processed_df
+        st.success("Columns mapped and data processed!")
+        st.dataframe(st.session_state.df.head())
+
 
 # ----------------------------
 # Step 1: Gemini dataset generation (if no upload)
 # ----------------------------
-if st.session_state.df is None:
+if uploaded_file is None:
     user_prompt = st.text_area(
         "Write your prompt for dataset (CSV format):",
         value="""Generate 20 software requirements in CSV format with EXACTLY 2 columns: RequirementText and NFR.
@@ -494,6 +725,7 @@ Separate columns using a comma. Each row must be on a new line. Output only CSV 
 # Step 2: Train Models
 # ----------------------------
 if st.session_state.df is not None:
+    st.header("Train a Model")
     df = st.session_state.df
     label_encoder = LabelEncoder()
     y = label_encoder.fit_transform(df["NFR"].astype(str))
@@ -592,6 +824,8 @@ if st.session_state.df is not None:
                 "results.csv",
                 "text/csv"
             )
+
+
 
 # import streamlit as st
 # import pandas as pd
