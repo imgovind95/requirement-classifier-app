@@ -227,10 +227,17 @@ def fix_columns(df):
 # ----------------------------
 # Step 1: Prompt for dataset
 # ----------------------------
+# prompt = st.text_area(
+#     "Write your prompt for dataset (CSV format):",
+#     "Generate 20 requirements in CSV format with columns: RequirementText,NFR"
+# )
 prompt = st.text_area(
     "Write your prompt for dataset (CSV format):",
-    "Generate 20 requirements in CSV format with columns: RequirementText,NFR"
+    "Generate 20 software requirements in CSV format with EXACTLY 2 columns: RequirementText and NFR. "
+    "Each row must have exactly 2 fields. Do not use commas or quotes inside the RequirementText or NFR fields. "
+    "Separate columns using a comma. Each row must be on a new line. Output only CSV content, no extra explanation or text."
 )
+
 gen_button = st.button("Generate Dataset")
 
 df = None
@@ -241,8 +248,12 @@ if gen_button and prompt:
         response = model.generate_content(prompt)
         raw_text = response.text
 
-        df = pd.read_csv(StringIO(raw_text))
-        df = fix_columns(df)
+        # df = pd.read_csv(StringIO(raw_text))
+        # df = fix_columns(df)
+        f = pd.read_csv(StringIO(raw_text))
+        except pd.errors.ParserError:
+    # Option 2: fallback: use tab as delimiter if comma parsing fails
+        df = pd.read_csv(StringIO(raw_text), sep="\t")
 
         if "RequirementText" not in df.columns or "NFR" not in df.columns:
             st.error("Dataset missing 'RequirementText' or 'NFR'. Please refine your prompt.")
