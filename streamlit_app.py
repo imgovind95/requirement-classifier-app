@@ -923,28 +923,70 @@ if st.session_state.df is not None:
         #     )
 
 
+        # if full_preds is not None:
+        #     st.header("Full Dataset Classification Results")
+        #     st.info("Yeh aapke poore dataset (100%) ka result hai, jismein har row ke liye prediction dikhaya gaya hai.")
+
+        #     # --- NEW: Add Classification Report for the full dataset ---
+        #     st.subheader("Overall Performance Metrics")
+        #     report = classification_report(
+        #         y,
+        #         full_preds,
+        #         labels=np.arange(len(label_encoder.classes_)),
+        #         target_names=label_encoder.classes_,
+        #         output_dict=True # Use this to easily convert to DataFrame
+        #     )
+            
+        #     # Convert the report to a nice table and display it
+        #     report_df = pd.DataFrame(report).transpose()
+        #     st.dataframe(report_df)
+        #     # --- END NEW ---
+
+        #     # Create a DataFrame with full results
+        #     full_results_df = pd.DataFrame({
+        #         "RequirementText": df["RequirementText"].values, # Original text
+        #         "Actual Label": label_encoder.inverse_transform(y),
+        #         "Predicted Label": label_encoder.inverse_transform(full_preds)
+        #     })
+
+        #     # Display the full results table
+        #     st.subheader("Row-by-Row Classification")
+        #     st.dataframe(full_results_df)
+
+        #     # Add a download button for the full results
+        #     st.download_button(
+        #         "Download Full Results",
+        #         full_results_df.to_csv(index=False).encode('utf-8'),
+        #         "full_classification_results.csv",
+        #         "text/csv"
+        #     )
+# --- ⭐ NEW (UPDATED): Displaying results for the ENTIRE dataset ---
         if full_preds is not None:
             st.header("Full Dataset Classification Results")
             st.info("Yeh aapke poore dataset (100%) ka result hai, jismein har row ke liye prediction dikhaya gaya hai.")
 
-            # --- NEW: Add Classification Report for the full dataset ---
-            st.subheader("Overall Performance Metrics")
+            # --- HIGHLIGHTED ACCURACY ---
+            overall_acc = accuracy_score(y, full_preds)
+            st.success(f"✅ Overall Accuracy on Full Dataset: {overall_acc:.2f}")
+            # --- END ---
+
+            # --- Add Classification Report for the full dataset ---
+            st.subheader("Overall Performance Metrics (Precision, Recall, F1-Score)")
             report = classification_report(
                 y,
                 full_preds,
                 labels=np.arange(len(label_encoder.classes_)),
                 target_names=label_encoder.classes_,
-                output_dict=True # Use this to easily convert to DataFrame
+                output_dict=True
             )
             
-            # Convert the report to a nice table and display it
             report_df = pd.DataFrame(report).transpose()
             st.dataframe(report_df)
-            # --- END NEW ---
+            # --- END ---
 
             # Create a DataFrame with full results
             full_results_df = pd.DataFrame({
-                "RequirementText": df["RequirementText"].values, # Original text
+                "RequirementText": df["RequirementText"].values,
                 "Actual Label": label_encoder.inverse_transform(y),
                 "Predicted Label": label_encoder.inverse_transform(full_preds)
             })
