@@ -828,12 +828,209 @@ Separate columns using a comma. Each row must be on a new line. Output only CSV 
 # ----------------------------
 # Step 2: Train Models
 # ----------------------------
-if st.session_state.df is not None:
+# if st.session_state.df is not None:
+#     st.header("Train a Model")
+#     df = st.session_state.df
+#     label_encoder = LabelEncoder()
+#     y = label_encoder.fit_transform(df["NFR"].astype(str))
+#     X = df["cleaned"].values
+
+#     X_train_text, X_test_text, y_train, y_test = train_test_split(
+#         X, y, test_size=0.2, random_state=42
+#     )
+
+#     model_choice = st.selectbox("Choose Model", ["Naive Bayes", "SVM", "Random Forest", "CNN", "LSTM"])
+#     run_button = st.button("Run Model")
+
+#     if run_button:
+#         preds = None
+#         full_preds = None # Variable to store full dataset predictions
+
+#         # --- Training the chosen model ---
+#         if model_choice in ["Naive Bayes", "SVM", "Random Forest"]:
+#             tfidf = TfidfVectorizer(max_features=5000)
+#             X_train_tfidf = tfidf.fit_transform(X_train_text)
+#             X_test_tfidf = tfidf.transform(X_test_text)
+
+#             if model_choice == "Naive Bayes":
+#                 model = MultinomialNB()
+#             elif model_choice == "SVM":
+#                 model = SVC(kernel="linear", random_state=42)
+#             else:
+#                 model = RandomForestClassifier(n_estimators=100, random_state=42)
+
+#             model.fit(X_train_tfidf, y_train)
+            
+#             # Predict on the entire dataset
+#             X_full_tfidf = tfidf.transform(X)
+#             full_preds = model.predict(X_full_tfidf)
+
+#         elif model_choice in ["CNN", "LSTM"]:
+#             tokenizer = Tokenizer(num_words=5000, oov_token="<OOV>")
+#             tokenizer.fit_on_texts(X_train_text)
+            
+#             max_len = 50
+#             X_train_pad = pad_sequences(tokenizer.texts_to_sequences(X_train_text), maxlen=max_len, padding="post", truncating="post")
+
+#             vocab_size = min(5000, len(tokenizer.word_index) + 1)
+            
+#             if model_choice == "CNN":
+#                 model = Sequential([
+#                     Embedding(vocab_size, 100, input_length=max_len),
+#                     Conv1D(128, 5, activation="relu"), GlobalMaxPooling1D(),
+#                     Dense(64, activation="relu"), Dense(len(label_encoder.classes_), activation="softmax")
+#                 ])
+#             else: # LSTM
+#                 model = Sequential([
+#                     Embedding(vocab_size, 100, input_length=max_len),
+#                     LSTM(128, dropout=0.2), Dense(64, activation="relu"),
+#                     Dense(len(label_encoder.classes_), activation="softmax")
+#                 ])
+
+#             model.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
+#             model.fit(X_train_pad, y_train, epochs=3, batch_size=32, validation_split=0.1, verbose=0)
+            
+#             # Predict on the entire dataset
+#             X_full_seq = tokenizer.texts_to_sequences(X)
+#             X_full_pad = pad_sequences(X_full_seq, maxlen=max_len, padding="post", truncating="post")
+#             full_preds = np.argmax(model.predict(X_full_pad), axis=1)
+
+#         # --- ⭐ NEW: Displaying results for the ENTIRE dataset ---
+#         # if full_preds is not None:
+#         #     st.header("Full Dataset Classification Results")
+#         #     st.info("Yeh aapke poore dataset (100%) ka result hai, jismein har row ke liye prediction dikhaya gaya hai.")
+
+#         #     # Calculate overall accuracy
+#         #     overall_acc = accuracy_score(y, full_preds)
+#         #     st.success(f"Overall Accuracy on Full Dataset: {overall_acc:.2f}")
+
+#         #     # Create a DataFrame with full results
+#         #     full_results_df = pd.DataFrame({
+#         #         "RequirementText": df["RequirementText"].values, # Original text
+#         #         "Actual Label": label_encoder.inverse_transform(y),
+#         #         "Predicted Label": label_encoder.inverse_transform(full_preds)
+#         #     })
+
+#         #     # Display the full results table
+#         #     st.dataframe(full_results_df)
+
+#         #     # Add a download button for the full results
+#         #     st.download_button(
+#         #         "Download Full Results",
+#         #         full_results_df.to_csv(index=False).encode('utf-8'),
+#         #         "full_classification_results.csv",
+#         #         "text/csv"
+#         #     )
+
+
+#         # if full_preds is not None:
+#         #     st.header("Full Dataset Classification Results")
+#         #     st.info("Yeh aapke poore dataset (100%) ka result hai, jismein har row ke liye prediction dikhaya gaya hai.")
+
+#         #     # --- NEW: Add Classification Report for the full dataset ---
+#         #     st.subheader("Overall Performance Metrics")
+#         #     report = classification_report(
+#         #         y,
+#         #         full_preds,
+#         #         labels=np.arange(len(label_encoder.classes_)),
+#         #         target_names=label_encoder.classes_,
+#         #         output_dict=True # Use this to easily convert to DataFrame
+#         #     )
+            
+#         #     # Convert the report to a nice table and display it
+#         #     report_df = pd.DataFrame(report).transpose()
+#         #     st.dataframe(report_df)
+#         #     # --- END NEW ---
+
+#         #     # Create a DataFrame with full results
+#         #     full_results_df = pd.DataFrame({
+#         #         "RequirementText": df["RequirementText"].values, # Original text
+#         #         "Actual Label": label_encoder.inverse_transform(y),
+#         #         "Predicted Label": label_encoder.inverse_transform(full_preds)
+#         #     })
+
+#         #     # Display the full results table
+#         #     st.subheader("Row-by-Row Classification")
+#         #     st.dataframe(full_results_df)
+
+#         #     # Add a download button for the full results
+#         #     st.download_button(
+#         #         "Download Full Results",
+#         #         full_results_df.to_csv(index=False).encode('utf-8'),
+#         #         "full_classification_results.csv",
+#         #         "text/csv"
+#         #     )
+# # --- ⭐ NEW (UPDATED): Displaying results for the ENTIRE dataset ---
+#         if full_preds is not None:
+#             st.header("Full Dataset Classification Results")
+#             st.info("Yeh aapke poore dataset (100%) ka result hai, jismein har row ke liye prediction dikhaya gaya hai.")
+
+#             # --- HIGHLIGHTED ACCURACY ---
+#             overall_acc = accuracy_score(y, full_preds)
+#             st.success(f"✅ Overall Accuracy on Full Dataset: {overall_acc:.2f}")
+#             # --- END ---
+
+#             # --- Add Classification Report for the full dataset ---
+#             st.subheader("Overall Performance Metrics (Precision, Recall, F1-Score)")
+#             report = classification_report(
+#                 y,
+#                 full_preds,
+#                 labels=np.arange(len(label_encoder.classes_)),
+#                 target_names=label_encoder.classes_,
+#                 output_dict=True
+#             )
+            
+#             report_df = pd.DataFrame(report).transpose()
+#             st.dataframe(report_df)
+#             # --- END ---
+
+#             # Create a DataFrame with full results
+#             full_results_df = pd.DataFrame({
+#                 "RequirementText": df["RequirementText"].values,
+#                 "Actual Label": label_encoder.inverse_transform(y),
+#                 "Predicted Label": label_encoder.inverse_transform(full_preds)
+#             })
+
+#             # Display the full results table
+#             st.subheader("Row-by-Row Classification")
+#             st.dataframe(full_results_df)
+
+#             # Add a download button for the full results
+#             st.download_button(
+#                 "Download Full Results",
+#                 full_results_df.to_csv(index=False).encode('utf-8'),
+#                 "full_classification_results.csv",
+#                 "text/csv"
+#             )
+# ----------------------------
+# Step 2: Train Models
+# ----------------------------
+if st.session_state.df is not in None:
     st.header("Train a Model")
     df = st.session_state.df
+
+    # --- ⭐ NEW CODE START: Convert Multi-Class to Binary (FR vs NFR) ---
+    st.info("Converting data to a simple Functional vs. Non-Functional problem.")
+    
+    # Yahan hum maan rahe hain ki 'Functionality' label FR hai. Baaki sab NFR hain.
+    # Aap isko apne dataset ke hisab se badal sakte hain.
+    functional_label = 'Functionality' 
+
+    # Ek naya column banayein jismein sirf do tarah ke label honge
+    # Agar label 'Functionality' hai, toh usko 'Functional' rakho.
+    # Agar label kuch aur hai (jaise Security, Usability, etc.), toh usko 'Non-Functional' bana do.
+    df['Binary_NFR'] = df['NFR'].apply(
+        lambda label: 'Functional' if str(label).strip().lower() == functional_label.lower() else 'Non-Functional'
+    )
+    
+    st.write("Preview of the simplified data:")
+    st.dataframe(df[['RequirementText', 'NFR', 'Binary_NFR']].head())
+    
     label_encoder = LabelEncoder()
-    y = label_encoder.fit_transform(df["NFR"].astype(str))
+    # Ab hum naye 'Binary_NFR' column par model ko train karenge
+    y = label_encoder.fit_transform(df["Binary_NFR"]) 
     X = df["cleaned"].values
+    # --- ⭐ NEW CODE END ---
 
     X_train_text, X_test_text, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42
@@ -842,7 +1039,11 @@ if st.session_state.df is not None:
     model_choice = st.selectbox("Choose Model", ["Naive Bayes", "SVM", "Random Forest", "CNN", "LSTM"])
     run_button = st.button("Run Model")
 
+    # (The rest of your 'if run_button:' code remains exactly the same)
+    # ... (baaki ka code waisa hi rahega) ...
+
     if run_button:
+        # ... (Your entire 'if run_button' block goes here without any changes)
         preds = None
         full_preds = None # Variable to store full dataset predictions
 
@@ -895,82 +1096,14 @@ if st.session_state.df is not None:
             X_full_pad = pad_sequences(X_full_seq, maxlen=max_len, padding="post", truncating="post")
             full_preds = np.argmax(model.predict(X_full_pad), axis=1)
 
-        # --- ⭐ NEW: Displaying results for the ENTIRE dataset ---
-        # if full_preds is not None:
-        #     st.header("Full Dataset Classification Results")
-        #     st.info("Yeh aapke poore dataset (100%) ka result hai, jismein har row ke liye prediction dikhaya gaya hai.")
-
-        #     # Calculate overall accuracy
-        #     overall_acc = accuracy_score(y, full_preds)
-        #     st.success(f"Overall Accuracy on Full Dataset: {overall_acc:.2f}")
-
-        #     # Create a DataFrame with full results
-        #     full_results_df = pd.DataFrame({
-        #         "RequirementText": df["RequirementText"].values, # Original text
-        #         "Actual Label": label_encoder.inverse_transform(y),
-        #         "Predicted Label": label_encoder.inverse_transform(full_preds)
-        #     })
-
-        #     # Display the full results table
-        #     st.dataframe(full_results_df)
-
-        #     # Add a download button for the full results
-        #     st.download_button(
-        #         "Download Full Results",
-        #         full_results_df.to_csv(index=False).encode('utf-8'),
-        #         "full_classification_results.csv",
-        #         "text/csv"
-        #     )
-
-
-        # if full_preds is not None:
-        #     st.header("Full Dataset Classification Results")
-        #     st.info("Yeh aapke poore dataset (100%) ka result hai, jismein har row ke liye prediction dikhaya gaya hai.")
-
-        #     # --- NEW: Add Classification Report for the full dataset ---
-        #     st.subheader("Overall Performance Metrics")
-        #     report = classification_report(
-        #         y,
-        #         full_preds,
-        #         labels=np.arange(len(label_encoder.classes_)),
-        #         target_names=label_encoder.classes_,
-        #         output_dict=True # Use this to easily convert to DataFrame
-        #     )
-            
-        #     # Convert the report to a nice table and display it
-        #     report_df = pd.DataFrame(report).transpose()
-        #     st.dataframe(report_df)
-        #     # --- END NEW ---
-
-        #     # Create a DataFrame with full results
-        #     full_results_df = pd.DataFrame({
-        #         "RequirementText": df["RequirementText"].values, # Original text
-        #         "Actual Label": label_encoder.inverse_transform(y),
-        #         "Predicted Label": label_encoder.inverse_transform(full_preds)
-        #     })
-
-        #     # Display the full results table
-        #     st.subheader("Row-by-Row Classification")
-        #     st.dataframe(full_results_df)
-
-        #     # Add a download button for the full results
-        #     st.download_button(
-        #         "Download Full Results",
-        #         full_results_df.to_csv(index=False).encode('utf-8'),
-        #         "full_classification_results.csv",
-        #         "text/csv"
-        #     )
-# --- ⭐ NEW (UPDATED): Displaying results for the ENTIRE dataset ---
-        if full_preds is not None:
+        # --- Displaying results for the ENTIRE dataset ---
+        if full_preds is not in None:
             st.header("Full Dataset Classification Results")
             st.info("Yeh aapke poore dataset (100%) ka result hai, jismein har row ke liye prediction dikhaya gaya hai.")
 
-            # --- HIGHLIGHTED ACCURACY ---
             overall_acc = accuracy_score(y, full_preds)
             st.success(f"✅ Overall Accuracy on Full Dataset: {overall_acc:.2f}")
-            # --- END ---
 
-            # --- Add Classification Report for the full dataset ---
             st.subheader("Overall Performance Metrics (Precision, Recall, F1-Score)")
             report = classification_report(
                 y,
@@ -982,20 +1115,16 @@ if st.session_state.df is not None:
             
             report_df = pd.DataFrame(report).transpose()
             st.dataframe(report_df)
-            # --- END ---
 
-            # Create a DataFrame with full results
             full_results_df = pd.DataFrame({
                 "RequirementText": df["RequirementText"].values,
                 "Actual Label": label_encoder.inverse_transform(y),
                 "Predicted Label": label_encoder.inverse_transform(full_preds)
             })
 
-            # Display the full results table
             st.subheader("Row-by-Row Classification")
             st.dataframe(full_results_df)
 
-            # Add a download button for the full results
             st.download_button(
                 "Download Full Results",
                 full_results_df.to_csv(index=False).encode('utf-8'),
