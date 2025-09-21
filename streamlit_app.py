@@ -250,10 +250,16 @@ if gen_button and prompt:
 
         # df = pd.read_csv(StringIO(raw_text))
         # df = fix_columns(df)
-        f = pd.read_csv(StringIO(raw_text))
-        except pd.errors.ParserError:
-    # Option 2: fallback: use tab as delimiter if comma parsing fails
-        df = pd.read_csv(StringIO(raw_text), sep="\t")
+    #     f = pd.read_csv(StringIO(raw_text))
+    #     except pd.errors.ParserError:
+    # # Option 2: fallback: use tab as delimiter if comma parsing fails
+    #     df = pd.read_csv(StringIO(raw_text), sep="\t")
+        try:
+    df = pd.read_csv(StringIO(raw_text))
+except pd.errors.ParserError:
+    # Fallback to tab-separated if comma parsing fails
+    df = pd.read_csv(StringIO(raw_text), sep="\t")
+
 
         if "RequirementText" not in df.columns or "NFR" not in df.columns:
             st.error("Dataset missing 'RequirementText' or 'NFR'. Please refine your prompt.")
