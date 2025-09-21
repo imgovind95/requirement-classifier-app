@@ -257,9 +257,125 @@ Separate columns using a comma. Each row must be on a new line. Output only CSV 
 #                 "text/csv"
 #             )
 
-# ----------------------------
-# Step 2: Train Models
-# ----------------------------
+# # ----------------------------
+# # Step 2: Train Models
+# # ----------------------------
+# # # ----------------------------
+# # # Step 2: Train Models
+# # # ----------------------------
+# # if st.session_state.df is not None:
+# #     st.header("Train a Model")
+# #     df = st.session_state.df
+
+# #     # --- Automatic label detection code ---
+# #     functional_labels = ['functionality', '0'] 
+# #     st.info(f"Automatically identifying labels like {functional_labels} as 'Functional'.")
+
+# #     df['Binary_NFR'] = df['NFR'].apply(
+# #         lambda label: 'Functional' if str(label).strip().lower() in functional_labels else 'Non-Functional'
+# #     )
+    
+# #     st.write("Preview of the simplified data:")
+# #     st.dataframe(df[['RequirementText', 'NFR', 'Binary_NFR']].head())
+    
+# #     label_encoder = LabelEncoder()
+# #     y = label_encoder.fit_transform(df["Binary_NFR"]) 
+# #     X = df["cleaned"].values
+# #     # --- End of automatic code ---
+
+# #     # --- ⭐ CORRECTION IS HERE ---
+# #     # We add stratify=y to ensure both train and test sets have a balanced mix of labels.
+# #     X_train_text, X_test_text, y_train, y_test = train_test_split(
+# #         X, y, test_size=0.2, random_state=42, stratify=y 
+# #     )
+# #     # --- ⭐ END OF CORRECTION ---
+
+# #     model_choice = st.selectbox("Choose Model", ["Naive Bayes", "SVM", "Random Forest", "CNN", "LSTM"])
+# #     run_button = st.button("Run Model")
+
+# #     if run_button:
+# #         # (The rest of your 'if run_button:' code remains exactly the same)
+# #         # ... (baaki ka code waisa hi rahega) ...
+# #         preds = None
+# #         full_preds = None 
+
+# #         if model_choice in ["Naive Bayes", "SVM", "Random Forest"]:
+# #             tfidf = TfidfVectorizer(max_features=5000)
+# #             X_train_tfidf = tfidf.fit_transform(X_train_text)
+            
+# #             if model_choice == "Naive Bayes":
+# #                 model = MultinomialNB()
+# #             elif model_choice == "SVM":
+# #                 model = SVC(kernel="linear", random_state=42)
+# #             else:
+# #                 model = RandomForestClassifier(n_estimators=100, random_state=42)
+
+# #             model.fit(X_train_tfidf, y_train)
+            
+# #             X_full_tfidf = tfidf.transform(X)
+# #             full_preds = model.predict(X_full_tfidf)
+
+# #         elif model_choice in ["CNN", "LSTM"]:
+# #             tokenizer = Tokenizer(num_words=5000, oov_token="<OOV>")
+# #             tokenizer.fit_on_texts(X_train_text)
+            
+# #             max_len = 50
+# #             X_train_pad = pad_sequences(tokenizer.texts_to_sequences(X_train_text), maxlen=max_len, padding="post", truncating="post")
+# #             vocab_size = min(5000, len(tokenizer.word_index) + 1)
+            
+# #             if model_choice == "CNN":
+# #                 model = Sequential([
+# #                     Embedding(vocab_size, 100, input_length=max_len),
+# #                     Conv1D(128, 5, activation="relu"), GlobalMaxPooling1D(),
+# #                     Dense(64, activation="relu"), Dense(len(label_encoder.classes_), activation="softmax")
+# #                 ])
+# #             else: # LSTM
+# #                 model = Sequential([
+# #                     Embedding(vocab_size, 100, input_length=max_len),
+# #                     LSTM(128, dropout=0.2), Dense(64, activation="relu"),
+# #                     Dense(len(label_encoder.classes_), activation="softmax")
+# #                 ])
+
+# #             model.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
+# #             model.fit(X_train_pad, y_train, epochs=3, batch_size=32, validation_split=0.1, verbose=0)
+            
+# #             X_full_seq = tokenizer.texts_to_sequences(X)
+# #             X_full_pad = pad_sequences(X_full_seq, maxlen=max_len, padding="post", truncating="post")
+# #             full_preds = np.argmax(model.predict(X_full_pad), axis=1)
+
+# #         if full_preds is not None:
+# #             st.header("Full Dataset Classification Results")
+# #             st.info("This table shows the prediction for every row in your dataset.")
+
+# #             overall_acc = accuracy_score(y, full_preds)
+# #             st.success(f"✅ Overall Accuracy on Full Dataset: {overall_acc:.2f}")
+
+# #             st.subheader("Overall Performance Metrics (Precision, Recall, F1-Score)")
+# #             report = classification_report(
+# #                 y,
+# #                 full_preds,
+# #                 labels=np.arange(len(label_encoder.classes_)),
+# #                 target_names=label_encoder.classes_,
+# #                 output_dict=True
+# #             )
+# #             report_df = pd.DataFrame(report).transpose()
+# #             st.dataframe(report_df)
+
+# #             full_results_df = pd.DataFrame({
+# #                 "RequirementText": df["RequirementText"].values,
+# #                 "Actual Label": label_encoder.inverse_transform(y),
+# #                 "Predicted Label": label_encoder.inverse_transform(full_preds)
+# #             })
+
+# #             st.subheader("Row-by-Row Classification")
+# #             st.dataframe(full_results_df)
+
+# #             st.download_button(
+# #                 "Download Full Results",
+# #                 full_results_df.to_csv(index=False).encode('utf-8'),
+# #                 "full_classification_results.csv",
+# #                 "text/csv"
+# #             )
 # # ----------------------------
 # # Step 2: Train Models
 # # ----------------------------
@@ -275,27 +391,44 @@ Separate columns using a comma. Each row must be on a new line. Output only CSV 
 #         lambda label: 'Functional' if str(label).strip().lower() in functional_labels else 'Non-Functional'
 #     )
     
-#     st.write("Preview of the simplified data:")
-#     st.dataframe(df[['RequirementText', 'NFR', 'Binary_NFR']].head())
-    
 #     label_encoder = LabelEncoder()
 #     y = label_encoder.fit_transform(df["Binary_NFR"]) 
 #     X = df["cleaned"].values
 #     # --- End of automatic code ---
 
-#     # --- ⭐ CORRECTION IS HERE ---
+#     # --- ⭐ NEW: DATA HEALTH CHECK ---
+#     st.subheader("Data Health Check")
+#     class_counts = pd.Series(y).value_counts()
+    
+#     if not class_counts.empty:
+#         class_names = label_encoder.inverse_transform(class_counts.index)
+#         st.write("Number of samples in each class before splitting:")
+#         st.dataframe(pd.DataFrame({'Class': class_names, 'Count': class_counts.values}))
+
+#         # Check if any class has fewer than 2 samples
+#         if class_counts.min() < 2:
+#             st.error(
+#                 "❌ ERROR: Model Training Halted. \n\n"
+#                 "One of your classes ('Functional' or 'Non-Functional') has only 1 sample. "
+#                 "The model needs at least 2 samples in each class to train properly. "
+#                 "Please check your dataset."
+#             )
+#             st.stop() # Stop the app from crashing
+#     else:
+#         st.error("Could not find any labels to train on. Please check your data.")
+#         st.stop()
+#     # --- ⭐ END OF HEALTH CHECK ---
+
 #     # We add stratify=y to ensure both train and test sets have a balanced mix of labels.
 #     X_train_text, X_test_text, y_train, y_test = train_test_split(
 #         X, y, test_size=0.2, random_state=42, stratify=y 
 #     )
-#     # --- ⭐ END OF CORRECTION ---
 
 #     model_choice = st.selectbox("Choose Model", ["Naive Bayes", "SVM", "Random Forest", "CNN", "LSTM"])
 #     run_button = st.button("Run Model")
 
 #     if run_button:
 #         # (The rest of your 'if run_button:' code remains exactly the same)
-#         # ... (baaki ka code waisa hi rahega) ...
 #         preds = None
 #         full_preds = None 
 
@@ -345,37 +478,7 @@ Separate columns using a comma. Each row must be on a new line. Output only CSV 
 
 #         if full_preds is not None:
 #             st.header("Full Dataset Classification Results")
-#             st.info("This table shows the prediction for every row in your dataset.")
-
-#             overall_acc = accuracy_score(y, full_preds)
-#             st.success(f"✅ Overall Accuracy on Full Dataset: {overall_acc:.2f}")
-
-#             st.subheader("Overall Performance Metrics (Precision, Recall, F1-Score)")
-#             report = classification_report(
-#                 y,
-#                 full_preds,
-#                 labels=np.arange(len(label_encoder.classes_)),
-#                 target_names=label_encoder.classes_,
-#                 output_dict=True
-#             )
-#             report_df = pd.DataFrame(report).transpose()
-#             st.dataframe(report_df)
-
-#             full_results_df = pd.DataFrame({
-#                 "RequirementText": df["RequirementText"].values,
-#                 "Actual Label": label_encoder.inverse_transform(y),
-#                 "Predicted Label": label_encoder.inverse_transform(full_preds)
-#             })
-
-#             st.subheader("Row-by-Row Classification")
-#             st.dataframe(full_results_df)
-
-#             st.download_button(
-#                 "Download Full Results",
-#                 full_results_df.to_csv(index=False).encode('utf-8'),
-#                 "full_classification_results.csv",
-#                 "text/csv"
-#             )
+#             # ... (rest of the code is the same) ...
 # ----------------------------
 # Step 2: Train Models
 # ----------------------------
@@ -396,7 +499,7 @@ if st.session_state.df is not None:
     X = df["cleaned"].values
     # --- End of automatic code ---
 
-    # --- ⭐ NEW: DATA HEALTH CHECK ---
+    # --- Data Health Check ---
     st.subheader("Data Health Check")
     class_counts = pd.Series(y).value_counts()
     
@@ -405,21 +508,14 @@ if st.session_state.df is not None:
         st.write("Number of samples in each class before splitting:")
         st.dataframe(pd.DataFrame({'Class': class_names, 'Count': class_counts.values}))
 
-        # Check if any class has fewer than 2 samples
         if class_counts.min() < 2:
-            st.error(
-                "❌ ERROR: Model Training Halted. \n\n"
-                "One of your classes ('Functional' or 'Non-Functional') has only 1 sample. "
-                "The model needs at least 2 samples in each class to train properly. "
-                "Please check your dataset."
-            )
-            st.stop() # Stop the app from crashing
+            st.error("❌ ERROR: One of your classes has fewer than 2 samples. Please use a more balanced dataset.")
+            st.stop()
     else:
-        st.error("Could not find any labels to train on. Please check your data.")
+        st.error("Could not find any labels to train on.")
         st.stop()
-    # --- ⭐ END OF HEALTH CHECK ---
+    # --- End of Health Check ---
 
-    # We add stratify=y to ensure both train and test sets have a balanced mix of labels.
     X_train_text, X_test_text, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42, stratify=y 
     )
@@ -427,55 +523,77 @@ if st.session_state.df is not None:
     model_choice = st.selectbox("Choose Model", ["Naive Bayes", "SVM", "Random Forest", "CNN", "LSTM"])
     run_button = st.button("Run Model")
 
+    # --- ⭐ ERROR DETECTIVE IS ADDED HERE ---
     if run_button:
-        # (The rest of your 'if run_button:' code remains exactly the same)
-        preds = None
-        full_preds = None 
+        try:
+            st.write("Debug: 'Run Model' button clicked. Starting process...")
+            preds = None
+            full_preds = None 
 
-        if model_choice in ["Naive Bayes", "SVM", "Random Forest"]:
-            tfidf = TfidfVectorizer(max_features=5000)
-            X_train_tfidf = tfidf.fit_transform(X_train_text)
-            
-            if model_choice == "Naive Bayes":
-                model = MultinomialNB()
-            elif model_choice == "SVM":
-                model = SVC(kernel="linear", random_state=42)
-            else:
-                model = RandomForestClassifier(n_estimators=100, random_state=42)
+            if model_choice in ["Naive Bayes", "SVM", "Random Forest"]:
+                st.write(f"Debug: Training {model_choice}...")
+                tfidf = TfidfVectorizer(max_features=5000)
+                X_train_tfidf = tfidf.fit_transform(X_train_text)
+                
+                if model_choice == "Naive Bayes": model = MultinomialNB()
+                elif model_choice == "SVM": model = SVC(kernel="linear", random_state=42)
+                else: model = RandomForestClassifier(n_estimators=100, random_state=42)
 
-            model.fit(X_train_tfidf, y_train)
-            
-            X_full_tfidf = tfidf.transform(X)
-            full_preds = model.predict(X_full_tfidf)
+                model.fit(X_train_tfidf, y_train)
+                
+                st.write("Debug: Predicting on the full dataset...")
+                X_full_tfidf = tfidf.transform(X)
+                full_preds = model.predict(X_full_tfidf)
 
-        elif model_choice in ["CNN", "LSTM"]:
-            tokenizer = Tokenizer(num_words=5000, oov_token="<OOV>")
-            tokenizer.fit_on_texts(X_train_text)
-            
-            max_len = 50
-            X_train_pad = pad_sequences(tokenizer.texts_to_sequences(X_train_text), maxlen=max_len, padding="post", truncating="post")
-            vocab_size = min(5000, len(tokenizer.word_index) + 1)
-            
-            if model_choice == "CNN":
-                model = Sequential([
-                    Embedding(vocab_size, 100, input_length=max_len),
-                    Conv1D(128, 5, activation="relu"), GlobalMaxPooling1D(),
-                    Dense(64, activation="relu"), Dense(len(label_encoder.classes_), activation="softmax")
-                ])
-            else: # LSTM
-                model = Sequential([
-                    Embedding(vocab_size, 100, input_length=max_len),
-                    LSTM(128, dropout=0.2), Dense(64, activation="relu"),
-                    Dense(len(label_encoder.classes_), activation="softmax")
-                ])
+            elif model_choice in ["CNN", "LSTM"]:
+                st.write(f"Debug: Training {model_choice}...")
+                tokenizer = Tokenizer(num_words=5000, oov_token="<OOV>")
+                tokenizer.fit_on_texts(X_train_text)
+                
+                max_len = 50
+                X_train_pad = pad_sequences(tokenizer.texts_to_sequences(X_train_text), maxlen=max_len, padding="post", truncating="post")
+                vocab_size = min(5000, len(tokenizer.word_index) + 1)
+                
+                if model_choice == "CNN":
+                    model = Sequential([Embedding(vocab_size, 100, input_length=max_len), Conv1D(128, 5, activation="relu"), GlobalMaxPooling1D(), Dense(64, activation="relu"), Dense(len(label_encoder.classes_), activation="softmax")])
+                else:
+                    model = Sequential([Embedding(vocab_size, 100, input_length=max_len), LSTM(128, dropout=0.2), Dense(64, activation="relu"), Dense(len(label_encoder.classes_), activation="softmax")])
 
-            model.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
-            model.fit(X_train_pad, y_train, epochs=3, batch_size=32, validation_split=0.1, verbose=0)
-            
-            X_full_seq = tokenizer.texts_to_sequences(X)
-            X_full_pad = pad_sequences(X_full_seq, maxlen=max_len, padding="post", truncating="post")
-            full_preds = np.argmax(model.predict(X_full_pad), axis=1)
+                model.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
+                model.fit(X_train_pad, y_train, epochs=3, batch_size=32, validation_split=0.1, verbose=0)
+                
+                st.write("Debug: Predicting on the full dataset...")
+                X_full_seq = tokenizer.texts_to_sequences(X)
+                X_full_pad = pad_sequences(X_full_seq, maxlen=max_len, padding="post", truncating="post")
+                full_preds = np.argmax(model.predict(X_full_pad), axis=1)
 
-        if full_preds is not None:
-            st.header("Full Dataset Classification Results")
-            # ... (rest of the code is the same) ...
+            st.write("Debug: Model training and prediction complete. Now displaying results.")
+
+            if full_preds is not None:
+                st.header("Full Dataset Classification Results")
+                
+                st.write("Debug: Calculating accuracy...")
+                overall_acc = accuracy_score(y, full_preds)
+                st.success(f"✅ Overall Accuracy on Full Dataset: {overall_acc:.2f}")
+
+                st.write("Debug: Generating performance report...")
+                report = classification_report(y, full_preds, labels=np.arange(len(label_encoder.classes_)), target_names=label_encoder.classes_, output_dict=True)
+                report_df = pd.DataFrame(report).transpose()
+                st.subheader("Overall Performance Metrics (Precision, Recall, F1-Score)")
+                st.dataframe(report_df)
+
+                st.write("Debug: Creating final results table...")
+                full_results_df = pd.DataFrame({
+                    "RequirementText": df["RequirementText"].values,
+                    "Actual Label": label_encoder.inverse_transform(y),
+                    "Predicted Label": label_encoder.inverse_transform(full_preds)
+                })
+                st.subheader("Row-by-Row Classification")
+                st.dataframe(full_results_df)
+
+                st.download_button("Download Full Results", full_results_df.to_csv(index=False).encode('utf-8'), "full_classification_results.csv", "text/csv")
+                st.write("Debug: All results displayed successfully!")
+
+        except Exception as e:
+            st.error("❌ OOPS! Ek error aa gaya. Neeche error ki detail di gayi hai:")
+            st.exception(e)
