@@ -211,12 +211,10 @@ def clean_text(text):
 
 def fix_columns(df):
     rename_map = {}
-    # Fix Requirement column
     if "RequirementText" not in df.columns:
         for col in df.columns:
             if "require" in col.lower():
                 rename_map[col] = "RequirementText"
-    # Fix NFR column
     if "NFR" not in df.columns:
         for col in df.columns:
             if "nfr" in col.lower() or "label" in col.lower() or "type" in col.lower():
@@ -227,10 +225,6 @@ def fix_columns(df):
 # ----------------------------
 # Step 1: Prompt for dataset
 # ----------------------------
-# prompt = st.text_area(
-#     "Write your prompt for dataset (CSV format):",
-#     "Generate 20 requirements in CSV format with columns: RequirementText,NFR"
-# )
 prompt = st.text_area(
     "Write your prompt for dataset (CSV format):",
     "Generate 20 software requirements in CSV format with EXACTLY 2 columns: RequirementText and NFR. "
@@ -248,18 +242,15 @@ if gen_button and prompt:
         response = model.generate_content(prompt)
         raw_text = response.text
 
-        # df = pd.read_csv(StringIO(raw_text))
-        # df = fix_columns(df)
-    #     f = pd.read_csv(StringIO(raw_text))
-    #     except pd.errors.ParserError:
-    # # Option 2: fallback: use tab as delimiter if comma parsing fails
-    #     df = pd.read_csv(StringIO(raw_text), sep="\t")
+        # ----------------------------
+        # Robust CSV parsing with fallback
+        # ----------------------------
         try:
-    df = pd.read_csv(StringIO(raw_text))
-except pd.errors.ParserError:
-    # Fallback to tab-separated if comma parsing fails
-    df = pd.read_csv(StringIO(raw_text), sep="\t")
+            df = pd.read_csv(StringIO(raw_text))
+        except pd.errors.ParserError:
+            df = pd.read_csv(StringIO(raw_text), sep="\t")
 
+        df = fix_columns(df)
 
         if "RequirementText" not in df.columns or "NFR" not in df.columns:
             st.error("Dataset missing 'RequirementText' or 'NFR'. Please refine your prompt.")
@@ -276,6 +267,7 @@ except pd.errors.ParserError:
                 "generated_dataset.csv",
                 "text/csv"
             )
+
     except Exception as e:
         st.error(f"Error while generating dataset: {e}")
 
