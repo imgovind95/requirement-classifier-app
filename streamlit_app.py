@@ -853,29 +853,33 @@ Separate columns using a comma. Each row must be on a new line. Output only CSV 
 # ----------------------------
 # Step 2: Train Models
 # ----------------------------
+# ----------------------------
+# Step 2: Train Models
+# ----------------------------
 if st.session_state.df is not None:
     st.header("Train a Model")
     df = st.session_state.df
 
-    # --- ⭐ NEW CODE START: Convert Multi-Class to Binary (FR vs NFR) ---
-    st.info("Converting data to a simple Functional vs. Non-Functional problem.")
+    # --- ⭐ NEW (AUTOMATIC) CODE START ---
     
-    # We are assuming the label for Functional Requirements is 'Functionality'.
-    # You can change this if your dataset uses a different label (e.g., 'FR', 'Functional').
-    functional_label = 'Functionality' 
+    # Humne yahan functional requirements ke possible labels ki ek list bana di hai.
+    # Aap is list mein aur bhi labels, jaise 'FR', add kar sakte hain.
+    functional_labels = ['functionality', '0'] 
 
-    # Create a new column to hold our simplified labels.
-    # If the original label is 'Functionality', we call it 'Functional'.
-    # We group everything else (Security, Usability, etc.) into 'Non-Functional'.
+    st.info(f"Automatically identifying labels like {functional_labels} as 'Functional'.")
+
+    # Ek naya column banayein jismein sirf do tarah ke label honge.
+    # Agar label functional_labels waali list mein hai, toh usko 'Functional' rakho.
+    # Agar label list mein nahi hai, toh usko 'Non-Functional' bana do.
     df['Binary_NFR'] = df['NFR'].apply(
-        lambda label: 'Functional' if str(label).strip().lower() == functional_label.lower() else 'Non-Functional'
+        lambda label: 'Functional' if str(label).strip().lower() in functional_labels else 'Non-Functional'
     )
     
     st.write("Preview of the simplified data:")
     st.dataframe(df[['RequirementText', 'NFR', 'Binary_NFR']].head())
     
     label_encoder = LabelEncoder()
-    # We will now train the model on our new, simplified 'Binary_NFR' column.
+    # Ab hum naye 'Binary_NFR' column par model ko train karenge
     y = label_encoder.fit_transform(df["Binary_NFR"]) 
     X = df["cleaned"].values
     # --- ⭐ NEW CODE END ---
@@ -888,10 +892,10 @@ if st.session_state.df is not None:
     run_button = st.button("Run Model")
 
     if run_button:
+        # (The rest of your 'if run_button:' code remains exactly the same)
         preds = None
         full_preds = None 
 
-        # --- Training the chosen model ---
         if model_choice in ["Naive Bayes", "SVM", "Random Forest"]:
             tfidf = TfidfVectorizer(max_features=5000)
             X_train_tfidf = tfidf.fit_transform(X_train_text)
@@ -936,7 +940,6 @@ if st.session_state.df is not None:
             X_full_pad = pad_sequences(X_full_seq, maxlen=max_len, padding="post", truncating="post")
             full_preds = np.argmax(model.predict(X_full_pad), axis=1)
 
-        # --- Displaying results for the ENTIRE dataset ---
         if full_preds is not None:
             st.header("Full Dataset Classification Results")
             st.info("This table shows the prediction for every row in your dataset.")
@@ -970,7 +973,6 @@ if st.session_state.df is not None:
                 "full_classification_results.csv",
                 "text/csv"
             )
-
 # import streamlit as st
 # import pandas as pd
 # import numpy as np
