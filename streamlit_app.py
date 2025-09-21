@@ -199,7 +199,7 @@ from tensorflow.keras.layers import Embedding, Conv1D, GlobalMaxPooling1D, LSTM,
 # ----------------------------
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 
-st.title("Requirement Classification App with Gemini Dataset Builder")
+st.title("Requirement Classification App Dataset Builder")
 
 # ----------------------------
 # Helpers
