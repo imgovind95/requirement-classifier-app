@@ -1,4 +1,3 @@
-# streamlit_app.py
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -20,27 +19,52 @@ from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Embedding, Conv1D, GlobalMaxPooling1D, LSTM, Dense
 
-# Lazy import transformers pipeline to avoid ImportError
-def get_pipeline():
-    from transformers import pipeline
-    return pipeline
+# ✅ CHANGE 1: Gemini SDK import & API setup
+import google.generativeai as genai
+from io import StringIO
+
+# ✅ CHANGE 2: Fix API key here (user ko key dalne ki need nahi)
+GEMINI_API_KEY = "YOUR_API_KEY_HERE"   # <- yahan apna Gemini API key paste karo
+genai.configure(api_key=GEMINI_API_KEY)
 
 # ----------------------------
 # Streamlit UI
 # ----------------------------
-st.title("Requirement Classification App")
+st.title("Requirement Classification App with Gemini Dataset Builder")
 
-uploaded_file = st.file_uploader("Upload your dataset (CSV/TSV)", type=["csv", "tsv"])
+# ✅ CHANGE 3: Add prompt input box
+prompt = st.text_area("Write your prompt for dataset (CSV format):", 
+                      "Generate 20 requirements in CSV format with columns: RequirementText,NFR")
 
-if uploaded_file is not None:
+gen_button = st.button("Generate Dataset")
+
+df = None
+
+# ✅ CHANGE 4: If user clicks button, Gemini se dataset lao
+if gen_button and prompt:
     try:
-        df = pd.read_csv(uploaded_file, sep="\t")
-    except:
-        df = pd.read_csv(uploaded_file, sep=None, engine="python")
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        response = model.generate_content(prompt)
+        raw_text = response.text
 
-    st.write("Preview of Data:", df.head())
+        # Parse CSV output from Gemini
+        df = pd.read_csv(StringIO(raw_text))
+        st.success("✅ Dataset generated successfully from Gemini!")
+        st.dataframe(df.head())
 
-    # Handle columns
+        # Download button
+        st.download_button(
+            "Download Generated Dataset",
+            df.to_csv(index=False),
+            "generated_dataset.csv",
+            "text/csv"
+        )
+
+    except Exception as e:
+        st.error(f"Error while parsing Gemini response: {e}")
+
+# ✅ CHANGE 5: Continue with classification if dataset available
+if df is not None:
     if len(df.columns) == 1:
         col0 = df.columns[0]
         splitted = df[col0].astype(str).str.split('\t', expand=True)
@@ -50,7 +74,6 @@ if uploaded_file is not None:
     if "niche" not in df.columns:
         df["niche"] = "unknown"
 
-    # Text Cleaning
     def clean_text(text):
         text = str(text)
         text = re.sub(r"[^a-zA-Z\s]", " ", text).lower()
@@ -58,20 +81,16 @@ if uploaded_file is not None:
     
     df["cleaned"] = df["RequirementText"].apply(clean_text)
 
-    # Encode labels
     label_encoder = LabelEncoder()
     y = label_encoder.fit_transform(df["NFR"].astype(str))
     X = df["cleaned"].values
     X_train_text, X_test_text, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-    # Model Selection
     model_choice = st.selectbox("Choose Model", ["Naive Bayes", "SVM", "Random Forest", "CNN", "LSTM"])
     run_button = st.button("Run Model")
 
     if run_button:
         preds = None
-
-        # Traditional ML models
         if model_choice in ["Naive Bayes", "SVM", "Random Forest"]:
             tfidf = TfidfVectorizer(max_features=5000)
             X_train_tfidf = tfidf.fit_transform(X_train_text)
@@ -87,7 +106,6 @@ if uploaded_file is not None:
             model.fit(X_train_tfidf, y_train)
             preds = model.predict(X_test_tfidf)
 
-        # CNN
         elif model_choice == "CNN":
             tokenizer = Tokenizer(num_words=5000, oov_token="<OOV>")
             tokenizer.fit_on_texts(X_train_text)
@@ -109,7 +127,6 @@ if uploaded_file is not None:
             model.fit(X_train_pad, y_train, epochs=3, batch_size=32, validation_split=0.1, verbose=0)
             preds = np.argmax(model.predict(X_test_pad), axis=1)
 
-        # LSTM
         elif model_choice == "LSTM":
             tokenizer = Tokenizer(num_words=5000, oov_token="<OOV>")
             tokenizer.fit_on_texts(X_train_text)
@@ -130,21 +147,6 @@ if uploaded_file is not None:
             model.fit(X_train_pad, y_train, epochs=3, batch_size=32, validation_split=0.1, verbose=0)
             preds = np.argmax(model.predict(X_test_pad), axis=1)
 
-    #     # Zero-Shot BART
-    #     elif model_choice == "Zero-Shot BART":
-    # try:
-    #     from transformers import pipeline
-    #     zsl = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
-    #     preds_list = []
-    #     for text in X_test_text:
-    #         res = zsl(text, list(label_encoder.classes_), multi_label=False)
-    #         preds_list.append(label_encoder.classes_.tolist().index(res["labels"][0]))
-    #     preds = np.array(preds_list)
-    # except Exception as e:
-    #     st.error("Zero-Shot BART failed. Make sure transformers & torch are installed.")
-    #     st.stop()
-
-        # If predictions exist, show accuracy and results
         if preds is not None:
             acc = accuracy_score(y_test, preds)
             st.success(f"{model_choice} Accuracy: {acc:.2f}")
@@ -156,22 +158,21 @@ if uploaded_file is not None:
                 target_names=label_encoder.classes_
             ))
 
-            # Full results dataframe
             results_df = pd.DataFrame({
                 "RequirementText": X_test_text,
                 "Actual": label_encoder.inverse_transform(y_test),
                 "Predicted": label_encoder.inverse_transform(preds)
             })
 
-            st.dataframe(results_df)  # show full results
+            st.dataframe(results_df)
 
-            # Download button for full results
             st.download_button(
                 "Download Full Results",
                 results_df.to_csv(index=False),
                 "results.csv",
                 "text/csv"
             )
+
 
 
 # import streamlit as st
