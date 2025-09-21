@@ -178,7 +178,7 @@ import pandas as pd
 import numpy as np
 import re
 import google.generativeai as genai
-from io import StringIO, BytesIO
+from io import StringIO
 
 from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -199,7 +199,7 @@ from tensorflow.keras.layers import Embedding, Conv1D, GlobalMaxPooling1D, LSTM,
 # ----------------------------
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 
-st.title("Requirement Classification App Dataset Builder")
+st.title("Requirement Classification App with Gemini Dataset Builder")
 
 # ----------------------------
 # Helpers
@@ -223,14 +223,18 @@ def fix_columns(df):
     return df
 
 # ----------------------------
+# Initialize session state
+# ----------------------------
+if "df" not in st.session_state:
+    st.session_state.df = None
+
+# ----------------------------
 # Step 0: Local file upload
 # ----------------------------
 uploaded_file = st.file_uploader(
     "Upload your dataset (CSV/TSV) or leave empty to generate via Gemini API:",
     type=["csv", "tsv"]
 )
-
-df = None
 
 if uploaded_file is not None:
     try:
@@ -242,20 +246,21 @@ if uploaded_file is not None:
         st.error("Uploaded file missing 'RequirementText' or 'NFR'.")
     else:
         df["cleaned"] = df["RequirementText"].apply(clean_text)
+        st.session_state.df = df
         st.success("Uploaded dataset loaded successfully")
         st.dataframe(df.head())
 
 # ----------------------------
-# Step 1: Prompt for dataset (only if no file uploaded)
+# Step 1: Gemini dataset generation
 # ----------------------------
-if uploaded_file is None:
+if st.session_state.df is None:
     prompt = st.text_area(
         "Write your prompt for dataset (CSV format):",
         "Generate 20 software requirements in CSV format with EXACTLY 2 columns: RequirementText and NFR. "
         "Each row must have exactly 2 fields. Do not use commas or quotes inside the RequirementText or NFR fields. "
         "Separate columns using a comma. Each row must be on a new line. Output only CSV content, no extra explanation or text."
     )
-    gen_button = st.button("Generate Dataset ")
+    gen_button = st.button("Generate Dataset via Gemini API")
 
     if gen_button and prompt:
         try:
@@ -273,22 +278,18 @@ if uploaded_file is None:
                 st.error("Dataset missing 'RequirementText' or 'NFR'. Please refine your prompt.")
             else:
                 df["cleaned"] = df["RequirementText"].apply(clean_text)
+                st.session_state.df = df
                 st.success("Dataset generated successfully via Gemini API")
                 st.dataframe(df.head())
 
-                st.download_button(
-                    "Download Generated Dataset",
-                    df.to_csv(index=False),
-                    "generated_dataset.csv",
-                    "text/csv"
-                )
         except Exception as e:
             st.error(f"Error while generating dataset: {e}")
 
 # ----------------------------
 # Step 2: Train Models
 # ----------------------------
-if df is not None and "RequirementText" in df.columns and "NFR" in df.columns:
+if st.session_state.df is not None:
+    df = st.session_state.df
     label_encoder = LabelEncoder()
     y = label_encoder.fit_transform(df["NFR"].astype(str))
     X = df["cleaned"].values
@@ -323,6 +324,7 @@ if df is not None and "RequirementText" in df.columns and "NFR" in df.columns:
             tokenizer.fit_on_texts(X_train_text)
             X_train_seq = tokenizer.texts_to_sequences(X_train_text)
             X_test_seq = tokenizer.texts_to_sequences(X_test_text)
+
             max_len = 50
             X_train_pad = pad_sequences(X_train_seq, maxlen=max_len, padding="post", truncating="post")
             X_test_pad = pad_sequences(X_test_seq, maxlen=max_len, padding="post", truncating="post")
@@ -344,6 +346,7 @@ if df is not None and "RequirementText" in df.columns and "NFR" in df.columns:
             tokenizer.fit_on_texts(X_train_text)
             X_train_seq = tokenizer.texts_to_sequences(X_train_text)
             X_test_seq = tokenizer.texts_to_sequences(X_test_text)
+
             max_len = 50
             X_train_pad = pad_sequences(X_train_seq, maxlen=max_len, padding="post", truncating="post")
             X_test_pad = pad_sequences(X_test_seq, maxlen=max_len, padding="post", truncating="post")
@@ -377,12 +380,14 @@ if df is not None and "RequirementText" in df.columns and "NFR" in df.columns:
             })
 
             st.dataframe(results_df)
+
             st.download_button(
                 "Download Full Results",
                 results_df.to_csv(index=False),
                 "results.csv",
                 "text/csv"
             )
+
 
 
 
