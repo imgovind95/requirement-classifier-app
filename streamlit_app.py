@@ -156,7 +156,7 @@ if st.session_state.df is not None:
         st.dataframe(pd.DataFrame({'Class': class_names, 'Count': class_counts.values}))
 
         if class_counts.min() < 2:
-            st.error("❌ ERROR: One of your classes has fewer than 2 samples. Please use a more balanced dataset.")
+            st.error("ERROR: One of your classes has fewer than 2 samples. Please use a more balanced dataset.")
             st.stop()
     else:
         st.error("Could not find any labels to train on.")
@@ -188,12 +188,12 @@ if st.session_state.df is not None:
 
                 model.fit(X_train_tfidf, y_train)
                 
-                st.write("Debug: Predicting on the full dataset...")
+                st.write("Predicting on the full dataset...")
                 X_full_tfidf = tfidf.transform(X)
                 full_preds = model.predict(X_full_tfidf)
 
             elif model_choice in ["CNN", "LSTM"]:
-                st.write(f"Debug: Training {model_choice}...")
+                st.write(f"Training {model_choice}...")
                 tokenizer = Tokenizer(num_words=5000, oov_token="<OOV>")
                 tokenizer.fit_on_texts(X_train_text)
                 
@@ -209,7 +209,7 @@ if st.session_state.df is not None:
                 model.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
                 model.fit(X_train_pad, y_train, epochs=3, batch_size=32, validation_split=0.1, verbose=0)
                 
-                st.write("Debug: Predicting on the full dataset...")
+                st.write("Predicting on the full dataset...")
                 X_full_seq = tokenizer.texts_to_sequences(X)
                 X_full_pad = pad_sequences(X_full_seq, maxlen=max_len, padding="post", truncating="post")
                 full_preds = np.argmax(model.predict(X_full_pad), axis=1)
@@ -219,17 +219,17 @@ if st.session_state.df is not None:
             if full_preds is not None:
                 st.header("Full Dataset Classification Results")
                 
-                st.write("Debug: Calculating accuracy...")
+                st.write("Calculating accuracy...")
                 overall_acc = accuracy_score(y, full_preds)
-                st.success(f"✅ Overall Accuracy on Full Dataset: {overall_acc:.2f}")
+                st.success(f"Overall Accuracy on Full Dataset: {overall_acc:.2f}")
 
-                st.write("Debug: Generating performance report...")
+                st.write("Generating performance report...")
                 report = classification_report(y, full_preds, labels=np.arange(len(label_encoder.classes_)), target_names=label_encoder.classes_, output_dict=True)
                 report_df = pd.DataFrame(report).transpose()
                 st.subheader("Overall Performance Metrics (Precision, Recall, F1-Score)")
                 st.dataframe(report_df)
 
-                st.write("Debug: Creating final results table...")
+                st.write("Creating final results table...")
                 full_results_df = pd.DataFrame({
                     "RequirementText": df["RequirementText"].values,
                     "Actual Label": label_encoder.inverse_transform(y),
@@ -239,7 +239,7 @@ if st.session_state.df is not None:
                 st.dataframe(full_results_df)
 
                 st.download_button("Download Full Results", full_results_df.to_csv(index=False).encode('utf-8'), "full_classification_results.csv", "text/csv")
-                st.write("Debug: All results displayed successfully!")
+                st.write("All results displayed successfully!")
 
         except Exception as e:
             st.error("❌ OOPS! Ek error aa gaya. Neeche error ki detail di gayi hai:")
