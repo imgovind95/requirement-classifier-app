@@ -121,7 +121,7 @@ Each row must have exactly 2 fields. Do not use commas or quotes inside the fiel
 Separate columns using a comma. Each row must be on a new line. Output only CSV content, no extra explanation or text."""
     )
 
-    if st.button("Generate Dataset"):
+    if st.button("Find Dataset"):
         try:
             model = genai.GenerativeModel("gemini-1.5-flash")
             response = model.generate_content(user_prompt)
@@ -138,7 +138,7 @@ Separate columns using a comma. Each row must be on a new line. Output only CSV 
                 df_gen["cleaned"] = df_gen["RequirementText"].apply(clean_text)
                 st.session_state.df = df_gen
                 st.session_state.model_accuracies = {} # Clear old results
-                st.success("Dataset generated successfully via Gemini API")
+                st.success("Dataset Fetch successfully via Gemini API")
                 st.dataframe(df_gen)
 
         except Exception as e:
